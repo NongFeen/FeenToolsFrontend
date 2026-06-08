@@ -31,28 +31,125 @@ interface PlayerData {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatLabel(key: string) {
-  return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return key
+    .replace(/_(mult|damage)/g, "") // Strips trailing technical suffixes for a cleaner UI
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// ── Shared Stat Group Panel Component ─────────────────────────────────────────
+// ── Sub-Grouping Sub-Header Categorization Definitions ────────────────────────
 
-interface StatSectionProps {
-  id: string; // Added to enable clean scrolling hooks
+const TITAN_SOUL_GROUPS = [
+  {
+    subTitle: "Titan Parts Multipliers",
+    keys: ["head_mult", "torso_mult", "limbs_mult", "armor_mult", "body_mult"],
+  },
+  {
+    subTitle: "Titan Boss Targeted Multipliers",
+    keys: [
+      "lojak_mult",
+      "takedar_mult",
+      "jukk_mult",
+      "sterl_mult",
+      "mohaca_mult",
+      "terro_mult",
+      "klonk_mult",
+      "priker_mult",
+    ],
+  },
+];
+
+const CARD_AND_GEM_GROUPS = [
+  {
+    subTitle: "General Base Metrics",
+    keys: ["base_damage"],
+  },
+  {
+    subTitle: "Anatomical Parts Damage",
+    keys: ["head_damage", "torso_damage", "limbs_damage"],
+  },
+  {
+    subTitle: "Armor Scaling Layers",
+    keys: [
+      "armor_damage",
+      "head_armor_damage",
+      "torso_armor_damage",
+      "limbs_armor_damage",
+    ],
+  },
+  {
+    subTitle: "Body Structure Layers",
+    keys: [
+      "body_damage",
+      "head_body_damage",
+      "torso_body_damage",
+      "limbs_body_damage",
+    ],
+  },
+  {
+    subTitle: "Titan Boss Type Modifiers",
+    keys: [
+      "lojak_damage",
+      "takedar_damage",
+      "jukk_damage",
+      "sterl_damage",
+      "mohaca_damage",
+      "terro_damage",
+      "klonk_damage",
+      "priker_damage",
+    ],
+  },
+  {
+    subTitle: "Burst Card Support & Triggers",
+    keys: [
+      "base_burst_damage",
+      "burst_lojak_damage",
+      "burst_takedar_damage",
+      "burst_jukk_damage",
+      "burst_sterl_damage",
+      "burst_mohaca_damage",
+      "burst_terro_damage",
+      "burst_klonk_damage",
+      "burst_priker_damage",
+    ],
+  },
+  {
+    subTitle: "Affliction Card Multipliers",
+    keys: [
+      "base_affliction_damage",
+      "affliction_lojak_damage",
+      "affliction_takedar_damage",
+      "affliction_jukk_damage",
+      "affliction_sterl_damage",
+      "affliction_mohaca_damage",
+      "affliction_terro_damage",
+      "affliction_klonk_damage",
+      "affliction_priker_damage",
+    ],
+  },
+];
+
+// ── Grouped Stat Panel Component ──────────────────────────────────────────────
+
+interface GroupedSectionProps {
+  id: string;
   title: string;
   description: string;
   stats: Record<string, number>;
+  structureGroups: Array<{ subTitle: string; keys: string[] }>;
   isPercentage?: boolean;
   onChange: (key: string, value: number) => void;
 }
 
-function StatSectionPanel({
+function GroupedStatSectionPanel({
   id,
   title,
   description,
   stats,
+  structureGroups,
   isPercentage = false,
   onChange,
-}: StatSectionProps) {
+}: GroupedSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
 
   return (
@@ -90,75 +187,109 @@ function StatSectionPanel({
       </div>
 
       {isOpen && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-            gap: "0.75rem",
-            marginTop: "1.25rem",
-          }}
-        >
-          {Object.entries(stats).map(([key, val]) => {
-            const displayValue = isPercentage ? Math.round(val * 100) : val;
+        <div style={{ marginTop: "1rem" }}>
+          {structureGroups.map((group) => {
+            // Filter keys present in active current payload to avoid blank items
+            const activeKeys = group.keys.filter((k) => k in stats);
+            if (activeKeys.length === 0) return null;
 
             return (
               <div
-                key={key}
-                className="result-card"
+                key={group.subTitle}
                 style={{
-                  display: "flex",
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "0.5rem 0.75rem",
+                  marginTop: "1.25rem",
+                  borderTop: "1px dashed var(--border)",
+                  paddingTop: "1rem",
                 }}
               >
-                <span
-                  className="result-label"
+                <h4
                   style={{
-                    fontSize: "0.8rem",
-                    textOverflow: "ellipsis",
-                    overflow: "hidden",
-                    whiteSpace: "nowrap",
-                    maxWidth: "130px",
+                    fontSize: "0.85rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "var(--accent)",
+                    margin: "0 0 0.75rem 0",
                   }}
                 >
-                  {formatLabel(key)}
-                </span>
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <input
-                    type="number"
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      borderBottom: "1px dashed var(--border)",
-                      color: "var(--text)",
-                      fontSize: "0.95rem",
-                      fontWeight: "bold",
-                      width: "60px",
-                      textAlign: "right",
-                      paddingRight: "2px",
-                    }}
-                    value={displayValue}
-                    onChange={(e) => {
-                      const inputNum = parseFloat(e.target.value) || 0;
-                      const savedValue = isPercentage
-                        ? inputNum / 100
-                        : inputNum;
-                      onChange(key, savedValue);
-                    }}
-                  />
-                  {isPercentage && (
-                    <span
-                      style={{
-                        fontSize: "0.85rem",
-                        color: "var(--text-muted)",
-                        marginLeft: "2px",
-                      }}
-                    >
-                      %
-                    </span>
-                  )}
+                  {group.subTitle}
+                </h4>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(220px, 1fr))",
+                    gap: "0.75rem",
+                  }}
+                >
+                  {activeKeys.map((key) => {
+                    const val = stats[key] ?? 0;
+                    const displayValue = isPercentage
+                      ? Math.round(val * 100)
+                      : val;
+
+                    return (
+                      <div
+                        key={key}
+                        className="result-card"
+                        style={{
+                          display: "flex",
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "0.5rem 0.75rem",
+                        }}
+                      >
+                        <span
+                          className="result-label"
+                          style={{
+                            fontSize: "0.8rem",
+                            textOverflow: "ellipsis",
+                            overflow: "hidden",
+                            whiteSpace: "nowrap",
+                            maxWidth: "150px",
+                          }}
+                        >
+                          {formatLabel(key)}
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <input
+                            type="number"
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              borderBottom: "1px dashed var(--border)",
+                              color: "var(--text)",
+                              fontSize: "0.95rem",
+                              fontWeight: "bold",
+                              width: "60px",
+                              textAlign: "right",
+                              paddingRight: "2px",
+                            }}
+                            value={displayValue}
+                            onChange={(e) => {
+                              const inputNum = parseFloat(e.target.value) || 0;
+                              const savedValue = isPercentage
+                                ? inputNum / 100
+                                : inputNum;
+                              onChange(key, savedValue);
+                            }}
+                          />
+                          {isPercentage && (
+                            <span
+                              style={{
+                                fontSize: "0.85rem",
+                                color: "var(--text-muted)",
+                                marginLeft: "2px",
+                              }}
+                            >
+                              %
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -336,6 +467,7 @@ function CardGrid({
             >
               {def?.image ? (
                 <img
+                  // src={`${API_BASE_URL}${def.image}`}
                   src={`${API_BASE_URL}${def.image}`}
                   alt={displayName}
                   style={{
@@ -346,6 +478,7 @@ function CardGrid({
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).style.display =
                       "none";
+                    console.log(`${API_BASE_URL}${def.image}`);
                     if (e.currentTarget.parentElement) {
                       e.currentTarget.parentElement.innerText = "🃏";
                     }
@@ -650,6 +783,7 @@ export default function TapTitan() {
           >
             <span>📥</span> Import Data
           </button>
+          <p className="sidebar-label">CustomBoss</p>
 
           <p className="sidebar-label" style={{ marginTop: "1rem" }}>
             Dashboard Index
@@ -752,11 +886,12 @@ export default function TapTitan() {
                 </div>
 
                 {/* 1. Titan Soul Research Panel */}
-                <StatSectionPanel
+                <GroupedStatSectionPanel
                   id="section-titan-soul"
                   title="Titan Soul Research"
                   description="Anatomical location and Titan Lord target multipliers (Percentages)."
                   stats={playerData.titan_soul_research}
+                  structureGroups={TITAN_SOUL_GROUPS}
                   isPercentage={true}
                   onChange={(k, v) =>
                     handleSubStatChange("titan_soul_research", k, v)
@@ -764,22 +899,24 @@ export default function TapTitan() {
                 />
 
                 {/* 2. Raid Card Research Panel */}
-                <StatSectionPanel
+                <GroupedStatSectionPanel
                   id="section-raid-card"
                   title="Raid Card Research Bonus"
-                  description="Flat card capability level tracking milestones."
+                  description="Flat card capability level tracking milestones separated by scaling categories."
                   stats={playerData.raid_card_research}
+                  structureGroups={CARD_AND_GEM_GROUPS}
                   onChange={(k, v) =>
                     handleSubStatChange("raid_card_research", k, v)
                   }
                 />
 
                 {/* 3. Gem Stone Research Panel */}
-                <StatSectionPanel
+                <GroupedStatSectionPanel
                   id="section-gem-stone"
                   title="Gem Stone Research Bonus"
-                  description="Flat talent stone alignment progression attributes."
+                  description="Flat talent stone alignment progression attributes separated by scaling categories."
                   stats={playerData.gem_stone_research}
+                  structureGroups={CARD_AND_GEM_GROUPS}
                   onChange={(k, v) =>
                     handleSubStatChange("gem_stone_research", k, v)
                   }
