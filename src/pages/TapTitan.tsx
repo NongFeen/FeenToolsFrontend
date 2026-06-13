@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import BaseStatBar from "../components/BaseStatBar";
 import GroupedStatSectionPanel from "../components/GroupedStatPanel";
 import CardGrid from "../components/CardGrid";
+import BossSettingPanel from "../components/BossSettingPanel";
 import {
   type PlayerData,
   TITAN_SOUL_GROUPS,
@@ -103,7 +104,14 @@ export default function TapTitan() {
           >
             <span>📥</span> Import Data
           </button>
-
+          <p className="sidebar-label">Boss Setting</p>
+          <button
+            className="side-btn"
+            // onClick={() => scrollToSection("section-multipliers")}
+            onClick={() => scrollToSection("section-boss")}
+          >
+            <span>📊</span> Boss
+          </button>
           <p className="sidebar-label" style={{ marginTop: "1rem" }}>
             Dashboard Index
           </p>
@@ -181,6 +189,8 @@ export default function TapTitan() {
               </div>
             ) : (
               <>
+                <BossSettingPanel />
+
                 <div id="section-multipliers" className="panel scroll-target">
                   <h2 className="panel-title">Account Base Multipliers</h2>
                   <p className="panel-desc">
@@ -211,7 +221,6 @@ export default function TapTitan() {
                     })
                   }
                 />
-
                 <GroupedStatSectionPanel
                   id="section-raid-card"
                   title="Raid Card Research Bonus"
