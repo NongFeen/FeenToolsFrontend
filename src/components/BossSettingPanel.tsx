@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 type PartState = "Cursed" | "Armor" | "Body" | "Skeleton";
 interface BossPartConfig {
   partName: string;
@@ -32,6 +34,18 @@ const INITIAL_PARTS: BossPartConfig[] = PART_NAMES.map((name) => ({
   currentHealth: 1000000,
 }));
 
+// Maps internal part names to CSS grid areas for the visual layout
+// const GRID_MAP: Record<string, string> = {
+//   Head: "head",
+//   Torso: "torso",
+//   LeftShoulder: "lshoulder",
+//   RightShoulder: "rshoulder",
+//   LeftHand: "lhand",
+//   RightHand: "rhand",
+//   LeftLeg: "lleg",
+//   RightLeg: "rleg",
+// };
+
 export default function BossSettingPanel() {
   const [bossName, setBossName] = useState("Lojak");
   const [parts, setParts] = useState<BossPartConfig[]>(INITIAL_PARTS);
@@ -40,6 +54,29 @@ export default function BossSettingPanel() {
     const newParts = [...parts];
     newParts[index] = { ...newParts[index], ...changes };
     setParts(newParts);
+  };
+
+  const handleSendToApi = async () => {
+    const data = {
+      bossName,
+      parts,
+    };
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/taptitan/sim_data`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      alert("Boss configuration sent to simulator successfully!");
+    } catch (error) {
+      console.error("Error sending boss data:", error);
+      alert("Failed to send boss configuration. Check console for details.");
+    }
   };
 
   const handleExport = () => {
@@ -80,13 +117,26 @@ export default function BossSettingPanel() {
         }}
       >
         <h2 className="panel-title">Boss Configuration</h2>
-        <button
-          className="btn-primary"
-          onClick={handleExport}
-          style={{ padding: "0.5rem 1rem", fontSize: "0.8rem" }}
-        >
-          📥 Export Boss JSON
-        </button>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button
+            className="btn-primary"
+            onClick={handleExport}
+            style={{ padding: "0.5rem 1rem", fontSize: "0.8rem" }}
+          >
+            📥 Export JSON
+          </button>
+          <button
+            className="btn-primary"
+            onClick={handleSendToApi}
+            style={{
+              padding: "0.5rem 1rem",
+              fontSize: "0.8rem",
+              backgroundColor: "#3182ce",
+            }}
+          >
+            🚀 Send to Sim
+          </button>
+        </div>
       </div>
       <p className="panel-desc">
         Set the current status, health, and armor for all 8 titan parts.
