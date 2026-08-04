@@ -98,9 +98,14 @@ export const api = {
   playerJobs: (playerId: string) =>
     request<SimulationJob[]>(`${playerPath(playerId)}/simulation-jobs`),
   currentBoss: () => request<CurrentBoss>("/api/current-boss"),
-  recommendation: (playerId: string, deckCount: 6 | 9) =>
+  recommendation: (
+    playerId: string,
+    deckCount: 6 | 9,
+    mustIncludeMirrorForce = false,
+    mustIncludeTeamTactics = false,
+  ) =>
     request<Recommendation>(
-      `${playerPath(playerId)}/recommendations/current?deck_count=${deckCount}`,
+      `${playerPath(playerId)}/recommendations/current?deck_count=${deckCount}&must_include_mirror_force=${mustIncludeMirrorForce}&must_include_team_tactics=${mustIncludeTeamTactics}`,
     ),
   cards: () => request<CardDefinition[]>("/api/taptitan/cards"),
   convertPlayerData: (body: unknown) =>

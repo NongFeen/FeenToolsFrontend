@@ -4,6 +4,7 @@ import type {
   BossPart,
   BossPartName,
   CurrentBoss,
+  GlobalRaidModifier,
   PartState,
 } from "../api/types";
 
@@ -16,6 +17,18 @@ const PARTS: Array<{ key: keyof BossData; name: BossPartName; label: string }> =
   { key: "right_hand", name: "RightHand", label: "Right hand" },
   { key: "left_leg", name: "LeftLeg", label: "Left leg" },
   { key: "right_leg", name: "RightLeg", label: "Right leg" },
+];
+
+const GLOBAL_RAID_MODIFIERS: Array<{ value: GlobalRaidModifier; label: string }> = [
+  { value: "None", label: "None" },
+  { value: "BurstDamage", label: "Burst damage ×1.30" },
+  { value: "BurstChance", label: "Burst chance ×1.30" },
+  { value: "SupportEffect", label: "Support effect ×1.15" },
+  { value: "AfflictionChance", label: "Affliction chance ×1.30" },
+  { value: "AfflictionDamage", label: "Affliction damage ×1.30" },
+  { value: "AllDamage", label: "All damage ×1.15" },
+  { value: "AttackDuration", label: "Attack duration +3 seconds" },
+  { value: "AfflictionDuration", label: "Affliction duration ×1.50" },
 ];
 
 interface Props {
@@ -44,12 +57,21 @@ export default function BossEditor({ value, onChange, onSave, saving }: Props) {
         <div><h2 className="panel-title">Current Boss</h2><p className="panel-desc">Edit the singleton boss. Saving clears old jobs and does not start simulations.</p></div>
         <button className="calc-btn" type="button" disabled={saving || value.attackable_parts.length === 0} onClick={onSave}>{saving ? "Saving…" : "Save boss"}</button>
       </div>
-      <label className="field boss-name-field">
-        <span>Titan name</span>
-        <select value={value.boss_data.boss_name} onChange={(event) => onChange({ ...value, boss_data: { ...value.boss_data, boss_name: event.target.value as BossName } })}>
-          {(["Lojak", "Takedar", "Jukk", "Sterl", "Mohaca", "Terro", "Klonk", "Priker"] as BossName[]).map((name) => <option key={name}>{name}</option>)}
-        </select>
-      </label>
+      <div className="boss-options-grid">
+        <label className="field">
+          <span>Titan name</span>
+          <select value={value.boss_data.boss_name} onChange={(event) => onChange({ ...value, boss_data: { ...value.boss_data, boss_name: event.target.value as BossName } })}>
+            {(["Lojak", "Takedar", "Jukk", "Sterl", "Mohaca", "Terro", "Klonk", "Priker"] as BossName[]).map((name) => <option key={name}>{name}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span>Global raid modifier</span>
+          <select value={value.boss_data.global_raid_modifier ?? "None"} onChange={(event) => onChange({ ...value, boss_data: { ...value.boss_data, global_raid_modifier: event.target.value as GlobalRaidModifier } })}>
+            {GLOBAL_RAID_MODIFIERS.map((modifier) => <option key={modifier.value} value={modifier.value}>{modifier.label}</option>)}
+          </select>
+          <small>Only one modifier can be active for the current boss.</small>
+        </label>
+      </div>
       <div className="boss-table-wrap">
         <table className="boss-table">
           <thead><tr><th>Part</th><th>State</th><th>Target</th><th>Max armor</th><th>Current armor</th><th>Max health</th><th>Current health</th></tr></thead>

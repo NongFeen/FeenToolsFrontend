@@ -91,6 +91,17 @@ export type BossPartName =
 
 export type PartState = "Cursed" | "Armor" | "Body" | "Skeleton";
 
+export type GlobalRaidModifier =
+  | "None"
+  | "BurstDamage"
+  | "BurstChance"
+  | "SupportEffect"
+  | "AfflictionChance"
+  | "AfflictionDamage"
+  | "AllDamage"
+  | "AttackDuration"
+  | "AfflictionDuration";
+
 export interface BossPart {
   part_name: BossPartName;
   part_state: PartState;
@@ -103,6 +114,7 @@ export interface BossPart {
 
 export interface BossData {
   boss_name: BossName;
+  global_raid_modifier: GlobalRaidModifier;
   head: BossPart;
   torso: BossPart;
   left_shoulder: BossPart;
@@ -149,6 +161,8 @@ export interface Recommendation {
   id: string;
   simulation_job_id: string;
   deck_count: 6 | 9;
+  must_include_mirror_force: boolean;
+  must_include_team_tactics: boolean;
   total_average_damage: string;
   decks: RecommendedDeck[];
   created_at: string;

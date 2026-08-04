@@ -7,12 +7,12 @@ const formatDamage = (value: string | number | undefined) => {
   try { return BigInt(String(value)).toLocaleString(); } catch { return String(value); }
 };
 
-interface Props { recommendation: Recommendation | null; cards: CardDefinition[]; loading: boolean; error: string; }
+interface Props { recommendation: Recommendation | null; cards: CardDefinition[]; loading: boolean; error: string; emptyMessage?: string; }
 
-export default function RecommendationDecks({ recommendation, cards, loading, error }: Props) {
+export default function RecommendationDecks({ recommendation, cards, loading, error, emptyMessage }: Props) {
   if (loading) return <div className="empty-state">Loading recommendations…</div>;
   if (error) return <div className="error-box recommendation-error">{error}</div>;
-  if (!recommendation || recommendation.decks.length === 0) return <div className="empty-state">No completed recommendation is available for this deck count.</div>;
+  if (!recommendation || recommendation.decks.length === 0) return <div className="empty-state">{emptyMessage ?? "No completed recommendation is available for this deck count."}</div>;
   const definitions = new Map(cards.map((card) => [normalizeCardKey(card.id), card] as const));
   return (
     <>

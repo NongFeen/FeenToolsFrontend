@@ -110,6 +110,9 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .tabs { display: flex; padding: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
 .tabs button { padding: .45rem .8rem; color: var(--text-muted); background: transparent; border: 0; border-radius: 5px; font-size: .8rem; }
 .tabs button.active { color: var(--text); background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.recommendation-controls { display: flex; flex-direction: column; align-items: flex-end; gap: .6rem; }
+.required-cards-toggle { display: flex; align-items: center; gap: .45rem; color: var(--text-muted); font-size: .76rem; cursor: pointer; }
+.required-cards-toggle input { accent-color: var(--accent); }
 .total-damage-card { margin: .5rem 0 1.25rem; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: var(--accent-light); border: 1px solid #ead8cf; border-radius: 8px; }
 .total-damage-card span { color: var(--text-muted); font-size: .82rem; }
 .total-damage-card strong { color: var(--accent); font: 1.5rem "DM Serif Display", serif; }
@@ -181,7 +184,8 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .vault-card-body label { display: flex; align-items: center; gap: .35rem; color: var(--text-muted); font-size: .68rem; }
 .vault-card-input { min-width: 0; width: 100%; padding: .15rem .3rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
 
-.boss-name-field { max-width: 260px; margin-bottom: 1rem; }
+.boss-options-grid { max-width: 620px; margin-bottom: 1rem; display: grid; grid-template-columns: minmax(160px, .7fr) minmax(260px, 1.3fr); gap: 1rem; }
+.boss-options-grid small { color: var(--text-muted); font-size: .68rem; font-weight: 400; }
 .boss-table-wrap { overflow-x: auto; }
 .boss-table { width: 100%; min-width: 840px; border-collapse: collapse; font-size: .78rem; }
 .boss-table th, .boss-table td { padding: .5rem; border-bottom: 1px solid var(--border); text-align: left; }
@@ -218,11 +222,12 @@ button:disabled { cursor: not-allowed; opacity: .52; }
   .job-status { grid-template-columns: 1fr; }
   .job-meta { align-items: flex-start; }
   .recommendations-panel .panel-heading-row { align-items: stretch; }
+  .recommendation-controls { align-items: stretch; }
   .tabs { width: 100%; }
   .tabs button { flex: 1; }
   .total-damage-card { align-items: flex-start; flex-direction: column; }
   .total-damage-card strong { font-size: 1.15rem; overflow-wrap: anywhere; }
-  .create-player-form, .selection-row, .field-grid { grid-template-columns: 1fr; }
+  .create-player-form, .selection-row, .field-grid, .boss-options-grid { grid-template-columns: 1fr; }
   .create-player-form .calc-btn, .selection-row .secondary-btn { width: 100%; }
   .save-bar { position: static; align-items: stretch; flex-direction: column; }
   .stat-grid-layout { grid-template-columns: 1fr; }

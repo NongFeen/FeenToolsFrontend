@@ -41,7 +41,13 @@ export default function TapTitanAdmin() {
       else setError(messageFor(playersResult.reason, "Could not load players."));
       if (cardsResult.status === "fulfilled") setCards(cardsResult.value);
       else setError(messageFor(cardsResult.reason, "Could not load card definitions."));
-      if (bossResult.status === "fulfilled") setBoss(bossResult.value);
+      if (bossResult.status === "fulfilled") setBoss({
+        ...bossResult.value,
+        boss_data: {
+          ...bossResult.value.boss_data,
+          global_raid_modifier: bossResult.value.boss_data.global_raid_modifier ?? "None",
+        },
+      });
       else if (!(bossResult.reason instanceof ApiError && bossResult.reason.status === 404)) setError(messageFor(bossResult.reason, "Could not load current boss."));
       setLoading(false);
     });
