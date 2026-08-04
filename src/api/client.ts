@@ -12,6 +12,7 @@ import type {
   PlayerStatsVersion,
   PlayerSummary,
   Recommendation,
+  RecommendationGenerationResponse,
   SimulationJob,
 } from "./types";
 
@@ -106,6 +107,11 @@ export const api = {
   ) =>
     request<Recommendation>(
       `${playerPath(playerId)}/recommendations/current?deck_count=${deckCount}&must_include_mirror_force=${mustIncludeMirrorForce}&must_include_team_tactics=${mustIncludeTeamTactics}`,
+    ),
+  generateNineDeckRecommendations: (playerId: string) =>
+    request<RecommendationGenerationResponse>(
+      `${playerPath(playerId)}/recommendations`,
+      { method: "POST", body: json({ deck_count: 9 }) },
     ),
   cards: () => request<CardDefinition[]>("/api/taptitan/cards"),
   convertPlayerData: (body: unknown) =>

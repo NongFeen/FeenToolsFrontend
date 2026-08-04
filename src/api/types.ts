@@ -168,6 +168,11 @@ export interface Recommendation {
   created_at: string;
 }
 
+export interface RecommendationGenerationResponse {
+  deck_count: 9;
+  created: boolean;
+}
+
 export interface HealthResponse {
   status: string;
   version: string;

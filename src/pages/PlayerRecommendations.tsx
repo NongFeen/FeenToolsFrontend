@@ -35,12 +35,14 @@ export default function PlayerRecommendations() {
     Record<DeckCount, string>
   >({ 6: "", 9: "" });
   const [recommendationsLoading, setRecommendationsLoading] = useState(true);
+  const [generatingNine, setGeneratingNine] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [bossError, setBossError] = useState("");
   const completedJobRef = useRef("");
   const recommendationRequestRef = useRef(0);
   const recommendationsInitializedRef = useRef(false);
+  const hasNineRecommendationRef = useRef(false);
   const pendingScrollPositionRef = useRef<number | null>(null);
 
   const loadRecommendations = useCallback(async () => {
@@ -48,42 +50,61 @@ export default function PlayerRecommendations() {
     if (!recommendationsInitializedRef.current) {
       setRecommendationsLoading(true);
     }
-    const [six, nine] = await Promise.allSettled([
-      api.recommendation(
-        playerId,
-        6,
-        mustIncludeMirrorForce,
-        mustIncludeTeamTactics,
-      ),
-      api.recommendation(
-        playerId,
-        9,
-        mustIncludeMirrorForce,
-        mustIncludeTeamTactics,
-      ),
-    ]);
-    if (recommendationRequestRef.current !== requestId) return;
+    try {
+      let recommendation: Recommendation;
+      try {
+        recommendation = await api.recommendation(
+          playerId,
+          tab,
+          mustIncludeMirrorForce,
+          mustIncludeTeamTactics,
+        );
+      } catch (error) {
+        if (tab !== 9 || !(error instanceof ApiError) || error.status !== 404) {
+          throw error;
+        }
+        if (recommendationRequestRef.current !== requestId) return;
+        if (!hasNineRecommendationRef.current) setGeneratingNine(true);
+        await api.generateNineDeckRecommendations(playerId);
+        recommendation = await api.recommendation(
+          playerId,
+          9,
+          mustIncludeMirrorForce,
+          mustIncludeTeamTactics,
+        );
+      }
+      if (recommendationRequestRef.current !== requestId) return;
+      if (tab === 9) hasNineRecommendationRef.current = true;
 
-    pendingScrollPositionRef.current = window.scrollY;
-    setRecommendations({
-      6: six.status === "fulfilled" ? six.value : null,
-      9: nine.status === "fulfilled" ? nine.value : null,
-    });
-    setRecommendationErrors({
-      6:
-        six.status === "rejected" &&
-        !(six.reason instanceof ApiError && six.reason.status === 404)
-          ? errorMessage(six.reason, "Could not load six-deck recommendations.")
-          : "",
-      9:
-        nine.status === "rejected" &&
-        !(nine.reason instanceof ApiError && nine.reason.status === 404)
-          ? errorMessage(nine.reason, "Could not load nine-deck recommendations.")
-          : "",
-    });
-    recommendationsInitializedRef.current = true;
-    setRecommendationsLoading(false);
-  }, [mustIncludeMirrorForce, mustIncludeTeamTactics, playerId]);
+      pendingScrollPositionRef.current = window.scrollY;
+      setRecommendations((current) => ({
+        ...current,
+        [tab]: recommendation,
+      }));
+      setRecommendationErrors((current) => ({ ...current, [tab]: "" }));
+    } catch (error) {
+      if (recommendationRequestRef.current !== requestId) return;
+
+      pendingScrollPositionRef.current = window.scrollY;
+      setRecommendations((current) => ({ ...current, [tab]: null }));
+      setRecommendationErrors((current) => ({
+        ...current,
+        [tab]:
+          error instanceof ApiError && error.status === 404
+            ? ""
+            : errorMessage(
+                error,
+                `Could not load ${tab === 6 ? "six" : "nine"}-deck recommendations.`,
+              ),
+      }));
+    } finally {
+      if (recommendationRequestRef.current === requestId) {
+        recommendationsInitializedRef.current = true;
+        setRecommendationsLoading(false);
+        setGeneratingNine(false);
+      }
+    }
+  }, [mustIncludeMirrorForce, mustIncludeTeamTactics, playerId, tab]);
 
   useLayoutEffect(() => {
     const scrollPosition = pendingScrollPositionRef.current;
@@ -102,6 +123,7 @@ export default function PlayerRecommendations() {
       setJobsReady(false);
       completedJobRef.current = "";
       recommendationsInitializedRef.current = false;
+      hasNineRecommendationRef.current = false;
       pendingScrollPositionRef.current = null;
       setRecommendationsLoading(true);
     });
@@ -140,6 +162,8 @@ export default function PlayerRecommendations() {
       setJobsReady(true);
       if (newest?.status === "completed" && completedJobRef.current !== newest.id) {
         completedJobRef.current = newest.id;
+        hasNineRecommendationRef.current = false;
+        setRecommendations((current) => ({ ...current, 9: null }));
         void loadRecommendations();
       }
     },
@@ -241,12 +265,14 @@ export default function PlayerRecommendations() {
           <RecommendationDecks
             recommendation={recommendations[tab]}
             cards={cards}
-            loading={recommendationsLoading}
+            loading={recommendationsLoading || generatingNine}
             error={recommendationErrors[tab]}
             emptyMessage={
-              mustIncludeMirrorForce || mustIncludeTeamTactics
-                ? "No recommendation containing the selected required cards is available. Run a new simulation to generate it."
-                : undefined
+              generatingNine
+                ? "Generating the best 9-deck recommendations from the latest simulation..."
+                : mustIncludeMirrorForce || mustIncludeTeamTactics
+                  ? "No recommendation containing the selected required cards is available. Run a new simulation to generate it."
+                  : undefined
             }
           />
         </section>
