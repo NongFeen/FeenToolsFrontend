@@ -19,6 +19,7 @@ export interface PlayerData {
   raid_card_research: Record<string, number>;
   gem_stone_research: Record<string, number>;
   card_list: CardEntry[];
+  title: number;
 }
 
 export function formatLabel(key: string) {

@@ -1,0 +1,179 @@
+export type JobStatus =
+  | "pending"
+  | "running"
+  | "optimizing"
+  | "completed"
+  | "failed";
+
+export interface ApiErrorBody {
+  code?: string;
+  message?: string;
+  error?: { code?: string; message?: string };
+}
+
+export interface PlayerSummary {
+  player_id: string;
+  display_name: string;
+  auto_sims: boolean;
+  stats_revision: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlayerDetail extends PlayerSummary {
+  stats: PlayerRaidData | null;
+}
+
+export interface CardDefinition {
+  id: string;
+  name: string;
+  type: string;
+  image: string;
+}
+
+export interface PlayerCard {
+  card_id: string;
+  cardtype: string;
+  level: number;
+}
+
+export interface PlayerRaidData {
+  player_raid_level: number;
+  player_raid_base_damage: number;
+  raid_set: Record<string, boolean>;
+  titan_soul_research: Record<string, number>;
+  raid_card_research: Record<string, number>;
+  gem_stone_research: Record<string, number>;
+  card_list: PlayerCard[];
+  title: number;
+}
+
+export interface PlayerStatsVersion {
+  revision: number;
+  stats: PlayerRaidData;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SimulationJob {
+  id: string;
+  player_id: string;
+  simulator_version: string;
+  status: JobStatus;
+  result: Record<string, unknown> | null;
+  error_message: string | null;
+  attempts: number;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export type BossName =
+  | "Lojak"
+  | "Takedar"
+  | "Jukk"
+  | "Sterl"
+  | "Mohaca"
+  | "Terro"
+  | "Klonk"
+  | "Priker";
+
+export type BossPartName =
+  | "Head"
+  | "Torso"
+  | "LeftShoulder"
+  | "RightShoulder"
+  | "LeftHand"
+  | "RightHand"
+  | "LeftLeg"
+  | "RightLeg";
+
+export type PartState = "Cursed" | "Armor" | "Body" | "Skeleton";
+
+export interface BossPart {
+  part_name: BossPartName;
+  part_state: PartState;
+  max_armor: number;
+  max_health: number;
+  current_armor: number;
+  current_health: number;
+  radioactivity_afflicted_seconds: number;
+}
+
+export interface BossData {
+  boss_name: BossName;
+  head: BossPart;
+  torso: BossPart;
+  left_shoulder: BossPart;
+  right_shoulder: BossPart;
+  left_hand: BossPart;
+  right_hand: BossPart;
+  left_leg: BossPart;
+  right_leg: BossPart;
+  damage_results: unknown[];
+}
+
+export interface CurrentBoss {
+  boss_data: BossData;
+  attackable_parts: BossPartName[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SimPatternResult {
+  pattern: string;
+  average_damage: number;
+  average_damage_display: string;
+  lowest_round_damage: number;
+  lowest_round_damage_display: string;
+  highest_round_damage: number;
+  highest_round_damage_display: string;
+}
+
+export interface SimDeckResult {
+  deck: string[];
+  deck_names?: string[];
+  total_attack_patterns?: number;
+  best_pattern: SimPatternResult | null;
+}
+
+export interface RecommendedDeck {
+  position: number;
+  cards: string[];
+  average_damage: string;
+  result: SimDeckResult;
+}
+
+export interface Recommendation {
+  id: string;
+  simulation_job_id: string;
+  deck_count: 6 | 9;
+  total_average_damage: string;
+  decks: RecommendedDeck[];
+  created_at: string;
+}
+
+export interface HealthResponse {
+  status: string;
+  version: string;
+  database: boolean;
+}
+
+export interface JobAccepted {
+  job_id: string;
+  created: boolean;
+}
+
+export interface BossUpdateAccepted {
+  status: string;
+  message: string;
+  simulations_triggered: boolean;
+  deleted_jobs: number;
+  created_jobs: string[];
+}
+
+export interface ConvertedPlayerDataResponse {
+  success: "true" | true;
+  data: { data: PlayerRaidData };
+}

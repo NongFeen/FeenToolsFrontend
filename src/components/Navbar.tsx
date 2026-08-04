@@ -15,9 +15,20 @@ export default function Navbar() {
         </Link>
         <Link
           to="/tools/taptitan"
-          className={pathname.startsWith("/tools") ? "active" : ""}
+          className={
+            pathname.startsWith("/tools/taptitan") &&
+            !pathname.startsWith("/tools/taptitan/admin")
+              ? "active"
+              : ""
+          }
         >
-          TaptitanTools
+          Recommendations
+        </Link>
+        <Link
+          to="/tools/taptitan/admin"
+          className={pathname.startsWith("/tools/taptitan/admin") ? "active" : ""}
+        >
+          Admin
         </Link>
       </div>
     </nav>
