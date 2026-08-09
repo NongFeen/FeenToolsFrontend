@@ -107,12 +107,12 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .spinner { width: 13px; height: 13px; border: 2px solid #ead8cf; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.tabs { display: flex; padding: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
-.tabs button { padding: .45rem .8rem; color: var(--text-muted); background: transparent; border: 0; border-radius: 5px; font-size: .8rem; }
-.tabs button.active { color: var(--text); background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 .recommendation-controls { display: flex; flex-direction: column; align-items: flex-end; gap: .6rem; }
 .required-cards-toggle { display: flex; align-items: center; gap: .45rem; color: var(--text-muted); font-size: .76rem; cursor: pointer; }
 .required-cards-toggle input { accent-color: var(--accent); }
+.deck-count-control { display: flex; align-items: center; gap: .55rem; color: var(--text-muted); font-size: .76rem; }
+.deck-count-control select { min-height: 36px; padding: .4rem 2rem .4rem .65rem; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; outline: none; }
+.deck-count-control select:focus { border-color: var(--accent); }
 .total-damage-card { margin: .5rem 0 1.25rem; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: var(--accent-light); border: 1px solid #ead8cf; border-radius: 8px; }
 .total-damage-card span { color: var(--text-muted); font-size: .82rem; }
 .total-damage-card strong { color: var(--accent); font: 1.5rem "DM Serif Display", serif; }
@@ -187,12 +187,21 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .boss-options-grid { max-width: 620px; margin-bottom: 1rem; display: grid; grid-template-columns: minmax(160px, .7fr) minmax(260px, 1.3fr); gap: 1rem; }
 .boss-options-grid small { color: var(--text-muted); font-size: .68rem; font-weight: 400; }
 .boss-table-wrap { overflow-x: auto; }
+.boss-group-helper { margin: 1rem 0; padding: .85rem 1rem 1rem; border: 1px solid var(--border); border-radius: .75rem; }
+.boss-group-helper legend { padding: 0 .35rem; font-weight: 700; }
+.boss-group-helper-heading { margin-bottom: .8rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.boss-group-helper-heading p { color: var(--text-muted); font-size: .82rem; }
+.boss-group-helper-heading .secondary-btn { flex: 0 0 auto; }
+.boss-group-helper-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: .8rem 1rem; }
+.boss-group-helper-grid .field small { color: var(--text-muted); font-weight: 400; }
 .boss-table { width: 100%; min-width: 840px; border-collapse: collapse; font-size: .78rem; }
 .boss-table th, .boss-table td { padding: .5rem; border-bottom: 1px solid var(--border); text-align: left; }
 .boss-table thead th { color: var(--text-muted); font-size: .66rem; letter-spacing: .04em; text-transform: uppercase; }
 .boss-table tbody th { white-space: nowrap; font-weight: 500; }
 .boss-table input { min-height: 34px; min-width: 85px; }
 .boss-table input[type="checkbox"] { min-width: 16px; width: 16px; accent-color: var(--accent); }
+.number-input-hint { margin: .65rem 0 0; color: var(--text-muted); font-size: .76rem; }
+input[aria-invalid="true"] { border-color: #b63e2a; }
 .boss-table select { min-height: 34px; min-width: 100px; }
 
 @media (max-width: 900px) {
@@ -223,11 +232,12 @@ button:disabled { cursor: not-allowed; opacity: .52; }
   .job-meta { align-items: flex-start; }
   .recommendations-panel .panel-heading-row { align-items: stretch; }
   .recommendation-controls { align-items: stretch; }
-  .tabs { width: 100%; }
-  .tabs button { flex: 1; }
+  .deck-count-control { justify-content: space-between; }
+  .deck-count-control select { flex: 1; }
   .total-damage-card { align-items: flex-start; flex-direction: column; }
   .total-damage-card strong { font-size: 1.15rem; overflow-wrap: anywhere; }
-  .create-player-form, .selection-row, .field-grid, .boss-options-grid { grid-template-columns: 1fr; }
+  .create-player-form, .selection-row, .field-grid, .boss-options-grid, .boss-group-helper-grid { grid-template-columns: 1fr; }
+  .boss-group-helper-heading { align-items: stretch; flex-direction: column; }
   .create-player-form .calc-btn, .selection-row .secondary-btn { width: 100%; }
   .save-bar { position: static; align-items: stretch; flex-direction: column; }
   .stat-grid-layout { grid-template-columns: 1fr; }

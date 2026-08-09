@@ -8,6 +8,7 @@ import {
   type PlayerData,
 } from "../dto/CardDefinitionDto";
 import type { CardDefinition } from "../api/types";
+import ShorthandNumberInput from "./ShorthandNumberInput";
 
 interface StatsEditorProps {
   data: PlayerData;
@@ -20,12 +21,12 @@ export default function StatsEditor({ data, cardDefinitions, onChange }: StatsEd
     <div className="editor-stack">
       <section id="section-multipliers" className="panel scroll-target">
         <h2 className="panel-title">Account Base Multipliers</h2>
-        <p className="panel-desc">Edit the player raid level and base damage.</p>
+        <p className="panel-desc">Edit the player raid level and base damage. Large values accept shorthand such as 22.52B.</p>
         <BaseStatBar data={data} onStatChange={(key, value) => onChange({ ...data, [key]: value })} />
         <div className="field-grid compact-fields">
           <label className="field">
             <span>Title bonus</span>
-            <input type="number" step="0.01" value={data.title} onChange={(event) => onChange({ ...data, title: Number(event.target.value) || 0 })} />
+            <ShorthandNumberInput value={data.title} onValueChange={(value) => onChange({ ...data, title: value })} />
           </label>
           <fieldset className="raid-set-fieldset">
             <legend>Raid sets</legend>

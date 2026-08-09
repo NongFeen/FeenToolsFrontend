@@ -1,10 +1,24 @@
 import { assetUrl } from "../api/client";
-import type { CardDefinition, Recommendation } from "../api/types";
+import type { CardDefinition, Recommendation, RecommendedDeck } from "../api/types";
 
 const normalizeCardKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 const formatDamage = (value: string | number | undefined) => {
   if (value === undefined) return "—";
   try { return BigInt(String(value)).toLocaleString(); } catch { return String(value); }
+};
+
+const averageDamageValue = (deck: RecommendedDeck) => {
+  const wholeNumber = String(
+    deck.average_damage ?? deck.result?.best_pattern?.average_damage ?? 0,
+  ).split(".")[0];
+  try { return BigInt(wholeNumber); } catch { return 0n; }
+};
+
+const compareAverageDamage = (left: RecommendedDeck, right: RecommendedDeck) => {
+  const leftDamage = averageDamageValue(left);
+  const rightDamage = averageDamageValue(right);
+  if (leftDamage === rightDamage) return left.position - right.position;
+  return leftDamage > rightDamage ? -1 : 1;
 };
 
 interface Props { recommendation: Recommendation | null; cards: CardDefinition[]; loading: boolean; error: string; emptyMessage?: string; }
@@ -14,16 +28,17 @@ export default function RecommendationDecks({ recommendation, cards, loading, er
   if (error) return <div className="error-box recommendation-error">{error}</div>;
   if (!recommendation || recommendation.decks.length === 0) return <div className="empty-state">{emptyMessage ?? "No completed recommendation is available for this deck count."}</div>;
   const definitions = new Map(cards.map((card) => [normalizeCardKey(card.id), card] as const));
+  const sortedDecks = [...recommendation.decks].sort(compareAverageDamage);
   return (
     <>
       <div className="total-damage-card"><span>Total combined average damage</span><strong>{formatDamage(recommendation.total_average_damage)}</strong></div>
       <div className="recommendation-grid">
-        {recommendation.decks.map((deck, index) => {
+        {sortedDecks.map((deck, index) => {
           const pattern = deck.result?.best_pattern;
           const deckCards = deck.cards?.length ? deck.cards : deck.result?.deck ?? [];
           return (
             <article className="deck-card" key={`${deck.position}-${index}`}>
-              <div className="deck-number">Deck {deck.position + 1}</div>
+              <div className="deck-number">Deck {index + 1}</div>
               <div className="deck-images">
                 {deckCards.slice(0, 3).map((cardId) => {
                   const definition = definitions.get(normalizeCardKey(cardId));

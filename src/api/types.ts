@@ -16,6 +16,9 @@ export interface PlayerSummary {
   display_name: string;
   auto_sims: boolean;
   stats_revision: number | null;
+  has_player_token: boolean;
+  player_token_status: "missing" | "configured" | "invalid";
+  tt2_last_fetched_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +56,11 @@ export interface PlayerStatsVersion {
   stats: PlayerRaidData;
   created_at: string;
   updated_at: string;
+}
+
+export interface Tt2PlayerStatus {
+  configured: boolean;
+  connected: boolean;
 }
 
 export interface SimulationJob {
@@ -160,7 +168,7 @@ export interface RecommendedDeck {
 export interface Recommendation {
   id: string;
   simulation_job_id: string;
-  deck_count: 6 | 9;
+  deck_count: number;
   must_include_mirror_force: boolean;
   must_include_team_tactics: boolean;
   total_average_damage: string;
@@ -169,7 +177,7 @@ export interface Recommendation {
 }
 
 export interface RecommendationGenerationResponse {
-  deck_count: 9;
+  deck_count: number;
   created: boolean;
 }
 

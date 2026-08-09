@@ -14,6 +14,7 @@ import type {
   Recommendation,
   RecommendationGenerationResponse,
   SimulationJob,
+  Tt2PlayerStatus,
 } from "./types";
 
 const baseUrl = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -96,22 +97,42 @@ export const api = {
       method: "PUT",
       body: json({ auto_sims }),
     }),
+  updatePlayerToken: (playerId: string, player_token: string) =>
+    request<PlayerSummary>(
+      `/internal/players/${encodeURIComponent(playerId)}/token`,
+      { method: "PUT", body: json({ player_token }) },
+      true,
+    ),
+  clearPlayerToken: (playerId: string) =>
+    request<PlayerSummary>(
+      `/internal/players/${encodeURIComponent(playerId)}/token`,
+      { method: "DELETE" },
+      true,
+    ),
+  fetchPlayerStats: (playerId: string) =>
+    request<PlayerStatsVersion>(
+      `/internal/players/${encodeURIComponent(playerId)}/fetch-stats`,
+      { method: "POST" },
+      true,
+    ),
+  tt2PlayerStatus: () =>
+    request<Tt2PlayerStatus>("/internal/tt2/player-status", {}, true),
   playerJobs: (playerId: string) =>
     request<SimulationJob[]>(`${playerPath(playerId)}/simulation-jobs`),
   currentBoss: () => request<CurrentBoss>("/api/current-boss"),
   recommendation: (
     playerId: string,
-    deckCount: 6 | 9,
+    deckCount: number,
     mustIncludeMirrorForce = false,
     mustIncludeTeamTactics = false,
   ) =>
     request<Recommendation>(
       `${playerPath(playerId)}/recommendations/current?deck_count=${deckCount}&must_include_mirror_force=${mustIncludeMirrorForce}&must_include_team_tactics=${mustIncludeTeamTactics}`,
     ),
-  generateNineDeckRecommendations: (playerId: string) =>
+  generateRecommendations: (playerId: string, deckCount: number) =>
     request<RecommendationGenerationResponse>(
       `${playerPath(playerId)}/recommendations`,
-      { method: "POST", body: json({ deck_count: 9 }) },
+      { method: "POST", body: json({ deck_count: deckCount }) },
     ),
   cards: () => request<CardDefinition[]>("/api/taptitan/cards"),
   convertPlayerData: (body: unknown) =>

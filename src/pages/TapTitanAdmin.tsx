@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
-import type { CardDefinition, CurrentBoss, PlayerRaidData, PlayerSummary, SimulationJob } from "../api/types";
+import type { CardDefinition, CurrentBoss, PlayerRaidData, PlayerSummary, SimulationJob, Tt2PlayerStatus } from "../api/types";
 import BossEditor from "../components/BossEditor";
 import JobStatus from "../components/JobStatus";
 import Navbar from "../components/Navbar";
@@ -16,7 +16,9 @@ export default function TapTitanAdmin() {
   const [cards, setCards] = useState<CardDefinition[]>([]);
   const [stats, setStats] = useState<PlayerRaidData | null>(null);
   const [boss, setBoss] = useState<CurrentBoss>(makeDefaultBoss);
-  const [createForm, setCreateForm] = useState({ player_id: "", display_name: "", auto_sims: false });
+  const [createForm, setCreateForm] = useState({ player_id: "", display_name: "", player_token: "", auto_sims: false });
+  const [playerToken, setPlayerToken] = useState("");
+  const [tt2Status, setTt2Status] = useState<Tt2PlayerStatus>({ configured: false, connected: false });
   const [rawInput, setRawInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -35,7 +37,7 @@ export default function TapTitanAdmin() {
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([api.players(), api.cards(), api.currentBoss()]).then(([playersResult, cardsResult, bossResult]) => {
+    Promise.allSettled([api.players(), api.cards(), api.currentBoss(), api.tt2PlayerStatus()]).then(([playersResult, cardsResult, bossResult, tt2Result]) => {
       if (!active) return;
       if (playersResult.status === "fulfilled") setPlayers(playersResult.value);
       else setError(messageFor(playersResult.reason, "Could not load players."));
@@ -49,6 +51,7 @@ export default function TapTitanAdmin() {
         },
       });
       else if (!(bossResult.reason instanceof ApiError && bossResult.reason.status === 404)) setError(messageFor(bossResult.reason, "Could not load current boss."));
+      if (tt2Result.status === "fulfilled") setTt2Status(tt2Result.value);
       setLoading(false);
     });
     return () => { active = false; };
@@ -69,6 +72,12 @@ export default function TapTitanAdmin() {
     return () => { active = false; };
   }, [selectedPlayerId]);
 
+  useEffect(() => {
+    if (notice !== "Stats saved.") return;
+    const timeoutId = window.setTimeout(() => setNotice(""), 5_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [notice]);
+
   usePolling({
     enabled: Boolean(forceJobId) && (!forceJob || isActiveJob(forceJob)),
     load: () => api.internalJob(forceJobId),
@@ -81,16 +90,52 @@ export default function TapTitanAdmin() {
     setSelectedPlayerId(playerId);
     setStats(null);
     setStatsLoading(Boolean(playerId));
+    setPlayerToken("");
     resetMessages();
   };
 
   const createPlayer = async (event: React.FormEvent) => {
     event.preventDefault(); resetMessages(); setBusy("create");
     try {
-      const created = await api.createPlayer({ ...createForm, player_id: createForm.player_id.trim(), display_name: createForm.display_name.trim() });
-      await refreshPlayers(); setCreateForm({ player_id: "", display_name: "", auto_sims: false }); selectPlayer(created.player_id); setNotice(`${created.display_name} was created.`);
+      const playerToken = createForm.player_token.trim();
+      const created = await api.createPlayer({ player_id: createForm.player_id.trim(), display_name: createForm.display_name.trim(), auto_sims: createForm.auto_sims });
+      if (playerToken) await api.updatePlayerToken(created.player_id, playerToken);
+      await refreshPlayers(); setCreateForm({ player_id: "", display_name: "", player_token: "", auto_sims: false }); selectPlayer(created.player_id); setNotice(`${created.display_name} was created${playerToken ? " with a configured TT2 token" : ""}.`);
     } catch (reason) { setError(messageFor(reason, "Could not create player.")); }
     finally { setBusy(""); }
+  };
+
+  const savePlayerToken = async () => {
+    resetMessages();
+    if (!selectedPlayerId || !playerToken.trim()) { setError("Select a player and enter a player token."); return; }
+    setBusy("token");
+    try { await api.updatePlayerToken(selectedPlayerId, playerToken.trim()); await refreshPlayers(); setPlayerToken(""); setNotice("Player token configured."); }
+    catch (reason) { setError(messageFor(reason, "Could not configure the player token.")); }
+    finally { setBusy(""); }
+  };
+
+  const clearPlayerToken = async () => {
+    resetMessages();
+    if (!selectedPlayerId) return;
+    setBusy("token");
+    try { await api.clearPlayerToken(selectedPlayerId); await refreshPlayers(); setPlayerToken(""); setNotice("Player token cleared."); }
+    catch (reason) { setError(messageFor(reason, "Could not clear the player token.")); }
+    finally { setBusy(""); }
+  };
+
+  const fetchLatestPlayerData = async () => {
+    resetMessages();
+    if (!selectedPlayerId) return;
+    setBusy("fetch");
+    try {
+      const saved = await api.fetchPlayerStats(selectedPlayerId);
+      setStats({ ...saved.stats, title: saved.stats.title ?? 0 });
+      await refreshPlayers();
+      setNotice("Latest TT2 player data fetched and saved.");
+    } catch (reason) {
+      setError(messageFor(reason, "Could not fetch the latest TT2 player data."));
+      api.tt2PlayerStatus().then(setTt2Status).catch(() => undefined);
+    } finally { setBusy(""); }
   };
 
   const importRawData = async () => {
@@ -112,7 +157,7 @@ export default function TapTitanAdmin() {
     resetMessages();
     if (!selectedPlayerId || !stats) { setError("Select a player and load or import stats first."); return; }
     setBusy("stats");
-    try { const saved = await api.updateStats(selectedPlayerId, stats); setStats(saved.stats); await refreshPlayers(); setNotice(`Stats saved as revision ${saved.revision}.`); }
+    try { const saved = await api.updateStats(selectedPlayerId, stats); setStats(saved.stats); await refreshPlayers(); setNotice("Stats saved."); }
     catch (reason) { setError(messageFor(reason, "Could not save player stats.")); }
     finally { setBusy(""); }
   };
@@ -163,6 +208,7 @@ export default function TapTitanAdmin() {
             <form className="create-player-form" onSubmit={createPlayer}>
               <label className="field"><span>Player ID</span><input required value={createForm.player_id} onChange={(event) => setCreateForm({ ...createForm, player_id: event.target.value })} placeholder="933qd64" /></label>
               <label className="field"><span>Display name</span><input required value={createForm.display_name} onChange={(event) => setCreateForm({ ...createForm, display_name: event.target.value })} placeholder="Feen" /></label>
+              <label className="field"><span>Player token (optional)</span><input type="password" autoComplete="off" value={createForm.player_token} onChange={(event) => setCreateForm({ ...createForm, player_token: event.target.value })} placeholder="Stored encrypted; never displayed again" /></label>
               <label className="check-row form-check"><input type="checkbox" checked={createForm.auto_sims} onChange={(event) => setCreateForm({ ...createForm, auto_sims: event.target.checked })} /><span>Auto simulations</span></label>
               <button className="calc-btn" disabled={busy === "create"}>{busy === "create" ? "Creating…" : "Create player"}</button>
             </form>
@@ -170,10 +216,20 @@ export default function TapTitanAdmin() {
               <label className="field"><span>Existing player</span><select value={selectedPlayerId} onChange={(event) => selectPlayer(event.target.value)}><option value="">Select a player…</option>{players.map((player) => <option key={player.player_id} value={player.player_id}>{player.display_name}</option>)}</select></label>
               <button className="secondary-btn" type="button" disabled={!selected || busy === "auto"} onClick={toggleAutoSims}>{selected ? `Auto sims: ${selected.auto_sims ? "On" : "Off"}` : "Auto sims"}</button>
             </div>
+            {selected && <div className="selection-row section-gap">
+              <label className="field"><span>TT2 player token — {selected.player_token_status === "configured" ? "Configured" : selected.player_token_status === "invalid" ? "Invalid" : "Missing"}</span><input type="password" autoComplete="off" value={playerToken} onChange={(event) => setPlayerToken(event.target.value)} placeholder={selected.has_player_token ? "Enter a replacement token" : "Enter player token"} /></label>
+              <button className="secondary-btn" type="button" disabled={!playerToken.trim() || busy === "token"} onClick={savePlayerToken}>{busy === "token" ? "Updating…" : selected.has_player_token ? "Replace token" : "Save token"}</button>
+              <button className="secondary-btn" type="button" disabled={!selected.has_player_token || busy === "token"} onClick={clearPlayerToken}>Clear token</button>
+            </div>}
+          </section>
+
+          <section className="panel scroll-target section-gap">
+            <div className="panel-heading-row"><div><h2 className="panel-title">Latest TT2 Player Data</h2><p className="panel-desc">Socket: {tt2Status.connected ? "Connected" : tt2Status.configured ? "Disconnected" : "Not configured"}. Fetching immediately converts and saves a new stats revision.</p></div><button className="calc-btn" type="button" disabled={!selected || !selected.has_player_token || selected.player_token_status === "invalid" || !tt2Status.connected || busy === "fetch"} onClick={fetchLatestPlayerData}>{busy === "fetch" ? "Fetching…" : "Fetch latest player data"}</button></div>
+            {selected?.tt2_last_fetched_at && <p className="panel-desc">Last fetch attempt: {new Date(selected.tt2_last_fetched_at).toLocaleString()}</p>}
           </section>
 
           <section id="section-import" className="panel scroll-target section-gap">
-            <h2 className="panel-title">Import Player Data</h2><p className="panel-desc">Paste a raw Tap Titans 2 export. It is converted into the detailed editor for the selected existing player.</p>
+            <h2 className="panel-title">Fallback: Import Player Data</h2><p className="panel-desc">Paste a raw Tap Titans 2 export only when the public API fetch is unavailable. It is converted into the editor before saving.</p>
             <textarea className="code-area" rows={10} spellCheck={false} value={rawInput} onChange={(event) => setRawInput(event.target.value)} placeholder={'{\n  "playerStats": { ... },\n  "raidCards": { ... }\n}'} />
             <button className="calc-btn" type="button" disabled={!selectedPlayerId || !rawInput.trim() || busy === "import"} onClick={importRawData}>{busy === "import" ? "Converting…" : "Parse and clean input"}</button>
           </section>

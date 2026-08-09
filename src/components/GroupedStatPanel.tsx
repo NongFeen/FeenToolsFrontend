@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { formatLabel } from "../dto/CardDefinitionDto";
+import ShorthandNumberInput from "./ShorthandNumberInput";
 
 interface Props {
   id: string;
@@ -24,7 +25,7 @@ export default function GroupedStatSectionPanel({ id, title, description, stats,
         if (!activeKeys.length) return null;
         return <div className="stat-section" key={group.subTitle}><h4>{group.subTitle}</h4><div className="stat-grid-layout">{activeKeys.map((key) => {
           const displayValue = isPercentage ? Math.round((stats[key] ?? 0) * 100) : (stats[key] ?? 0);
-          return <label key={key} className="result-card stat-row-card"><span className="result-label">{formatLabel(key)}</span><span className="inline-input-wrap"><input type="number" className="stat-inline-input" value={displayValue} onChange={(event) => { const value = Number.parseFloat(event.target.value) || 0; onChange(key, isPercentage ? value / 100 : value); }} />{isPercentage && <span>%</span>}</span></label>;
+          return <label key={key} className="result-card stat-row-card"><span className="result-label">{formatLabel(key)}</span><span className="inline-input-wrap"><ShorthandNumberInput className="stat-inline-input" value={displayValue} onValueChange={(value) => onChange(key, isPercentage ? value / 100 : value)} />{isPercentage && <span>%</span>}</span></label>;
         })}</div></div>;
       })}</div>}
     </section>

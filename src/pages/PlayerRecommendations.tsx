@@ -14,7 +14,12 @@ import RecommendationDecks from "../components/RecommendationDecks";
 import { usePolling } from "../hooks/usePolling";
 import { isActiveJob } from "../utils/taptitan";
 
-type DeckCount = 6 | 9;
+const DEFAULT_DECK_COUNT = 6;
+const MAX_DECK_COUNT = 14;
+const deckCountOptions = Array.from(
+  { length: MAX_DECK_COUNT },
+  (_, index) => index + 1,
+);
 const errorMessage = (error: unknown, fallback: string) =>
   error instanceof ApiError ? error.message : fallback;
 
@@ -25,24 +30,24 @@ export default function PlayerRecommendations() {
   const [cards, setCards] = useState<CardDefinition[]>([]);
   const [latestJob, setLatestJob] = useState<SimulationJob | null>(null);
   const [jobsReady, setJobsReady] = useState(false);
-  const [tab, setTab] = useState<DeckCount>(6);
+  const [deckCount, setDeckCount] = useState(DEFAULT_DECK_COUNT);
   const [mustIncludeMirrorForce, setMustIncludeMirrorForce] = useState(false);
   const [mustIncludeTeamTactics, setMustIncludeTeamTactics] = useState(false);
   const [recommendations, setRecommendations] = useState<
-    Record<DeckCount, Recommendation | null>
-  >({ 6: null, 9: null });
+    Record<number, Recommendation | null>
+  >({ [DEFAULT_DECK_COUNT]: null });
   const [recommendationErrors, setRecommendationErrors] = useState<
-    Record<DeckCount, string>
-  >({ 6: "", 9: "" });
+    Record<number, string>
+  >({ [DEFAULT_DECK_COUNT]: "" });
   const [recommendationsLoading, setRecommendationsLoading] = useState(true);
-  const [generatingNine, setGeneratingNine] = useState(false);
+  const [generatingRecommendation, setGeneratingRecommendation] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [bossError, setBossError] = useState("");
   const completedJobRef = useRef("");
   const recommendationRequestRef = useRef(0);
   const recommendationsInitializedRef = useRef(false);
-  const hasNineRecommendationRef = useRef(false);
+  const generatedDeckCountsRef = useRef(new Set<number>());
   const pendingScrollPositionRef = useRef<number | null>(null);
 
   const loadRecommendations = useCallback(async () => {
@@ -55,56 +60,60 @@ export default function PlayerRecommendations() {
       try {
         recommendation = await api.recommendation(
           playerId,
-          tab,
+          deckCount,
           mustIncludeMirrorForce,
           mustIncludeTeamTactics,
         );
       } catch (error) {
-        if (tab !== 9 || !(error instanceof ApiError) || error.status !== 404) {
+        if (!(error instanceof ApiError) || error.status !== 404) {
           throw error;
         }
         if (recommendationRequestRef.current !== requestId) return;
-        if (!hasNineRecommendationRef.current) setGeneratingNine(true);
-        await api.generateNineDeckRecommendations(playerId);
+        if (!generatedDeckCountsRef.current.has(deckCount)) {
+          setGeneratingRecommendation(true);
+          await api.generateRecommendations(playerId, deckCount);
+          if (recommendationRequestRef.current !== requestId) return;
+          generatedDeckCountsRef.current.add(deckCount);
+        }
         recommendation = await api.recommendation(
           playerId,
-          9,
+          deckCount,
           mustIncludeMirrorForce,
           mustIncludeTeamTactics,
         );
       }
       if (recommendationRequestRef.current !== requestId) return;
-      if (tab === 9) hasNineRecommendationRef.current = true;
+      generatedDeckCountsRef.current.add(deckCount);
 
       pendingScrollPositionRef.current = window.scrollY;
       setRecommendations((current) => ({
         ...current,
-        [tab]: recommendation,
+        [deckCount]: recommendation,
       }));
-      setRecommendationErrors((current) => ({ ...current, [tab]: "" }));
+      setRecommendationErrors((current) => ({ ...current, [deckCount]: "" }));
     } catch (error) {
       if (recommendationRequestRef.current !== requestId) return;
 
       pendingScrollPositionRef.current = window.scrollY;
-      setRecommendations((current) => ({ ...current, [tab]: null }));
+      setRecommendations((current) => ({ ...current, [deckCount]: null }));
       setRecommendationErrors((current) => ({
         ...current,
-        [tab]:
+        [deckCount]:
           error instanceof ApiError && error.status === 404
             ? ""
             : errorMessage(
                 error,
-                `Could not load ${tab === 6 ? "six" : "nine"}-deck recommendations.`,
+                `Could not load ${deckCount}-deck recommendations.`,
               ),
       }));
     } finally {
       if (recommendationRequestRef.current === requestId) {
         recommendationsInitializedRef.current = true;
         setRecommendationsLoading(false);
-        setGeneratingNine(false);
+        setGeneratingRecommendation(false);
       }
     }
-  }, [mustIncludeMirrorForce, mustIncludeTeamTactics, playerId, tab]);
+  }, [deckCount, mustIncludeMirrorForce, mustIncludeTeamTactics, playerId]);
 
   useLayoutEffect(() => {
     const scrollPosition = pendingScrollPositionRef.current;
@@ -123,7 +132,7 @@ export default function PlayerRecommendations() {
       setJobsReady(false);
       completedJobRef.current = "";
       recommendationsInitializedRef.current = false;
-      hasNineRecommendationRef.current = false;
+      generatedDeckCountsRef.current.clear();
       pendingScrollPositionRef.current = null;
       setRecommendationsLoading(true);
     });
@@ -162,8 +171,7 @@ export default function PlayerRecommendations() {
       setJobsReady(true);
       if (newest?.status === "completed" && completedJobRef.current !== newest.id) {
         completedJobRef.current = newest.id;
-        hasNineRecommendationRef.current = false;
-        setRecommendations((current) => ({ ...current, 9: null }));
+        generatedDeckCountsRef.current.clear();
         void loadRecommendations();
       }
     },
@@ -256,23 +264,32 @@ export default function PlayerRecommendations() {
                 />
                 <span>Must include Team Tactics</span>
               </label>
-              <div className="tabs" role="tablist" aria-label="Recommendation deck count">
-                <button type="button" role="tab" aria-selected={tab === 6} className={tab === 6 ? "active" : ""} onClick={() => setTab(6)}>Best 6 decks</button>
-                <button type="button" role="tab" aria-selected={tab === 9} className={tab === 9 ? "active" : ""} onClick={() => setTab(9)}>Best 9 decks</button>
-              </div>
+              <label className="deck-count-control">
+                <span>Number of decks</span>
+                <select
+                  value={deckCount}
+                  onChange={(event) => setDeckCount(Number(event.target.value))}
+                >
+                  {deckCountOptions.map((count) => (
+                    <option key={count} value={count}>
+                      Best {count} {count === 1 ? "deck" : "decks"}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
           <RecommendationDecks
-            recommendation={recommendations[tab]}
+            recommendation={recommendations[deckCount] ?? null}
             cards={cards}
-            loading={recommendationsLoading || generatingNine}
-            error={recommendationErrors[tab]}
+            loading={recommendationsLoading || generatingRecommendation}
+            error={recommendationErrors[deckCount] ?? ""}
             emptyMessage={
-              generatingNine
-                ? "Generating the best 9-deck recommendations from the latest simulation..."
+              generatingRecommendation
+                ? `Generating the best ${deckCount}-deck recommendations from the latest simulation...`
                 : mustIncludeMirrorForce || mustIncludeTeamTactics
-                  ? "No recommendation containing the selected required cards is available. Run a new simulation to generate it."
-                  : undefined
+                  ? `No compatible ${deckCount}-deck recommendation containing the selected required cards is available.`
+                  : `No compatible ${deckCount}-deck recommendation is available.`
             }
           />
         </section>
