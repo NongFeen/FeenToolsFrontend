@@ -2,9 +2,14 @@ import { assetUrl } from "../api/client";
 import type { CardDefinition, Recommendation, RecommendedDeck } from "../api/types";
 
 const normalizeCardKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
-const formatDamage = (value: string | number | undefined) => {
+const formatDamage = (value: string | number | undefined, multiplier = 1) => {
   if (value === undefined) return "—";
-  try { return BigInt(String(value)).toLocaleString(); } catch { return String(value); }
+  try {
+    const wholeDamage = BigInt(String(value).split(".")[0]);
+    const scale = 1_000_000n;
+    const scaledMultiplier = BigInt(Math.round(multiplier * Number(scale)));
+    return ((wholeDamage * scaledMultiplier) / scale).toLocaleString();
+  } catch { return String(value); }
 };
 
 const averageDamageValue = (deck: RecommendedDeck) => {
@@ -21,9 +26,27 @@ const compareAverageDamage = (left: RecommendedDeck, right: RecommendedDeck) => 
   return leftDamage > rightDamage ? -1 : 1;
 };
 
-interface Props { recommendation: Recommendation | null; cards: CardDefinition[]; loading: boolean; error: string; emptyMessage?: string; }
+interface Props {
+  recommendation: Recommendation | null;
+  cards: CardDefinition[];
+  loading: boolean;
+  error: string;
+  emptyMessage?: string;
+  damageMultiplier?: number;
+  moralePercent?: number;
+  loyaltyPercent?: number;
+}
 
-export default function RecommendationDecks({ recommendation, cards, loading, error, emptyMessage }: Props) {
+export default function RecommendationDecks({
+  recommendation,
+  cards,
+  loading,
+  error,
+  emptyMessage,
+  damageMultiplier = 1,
+  moralePercent = 0,
+  loyaltyPercent = 0,
+}: Props) {
   if (loading) return <div className="empty-state">Loading recommendations…</div>;
   if (error) return <div className="error-box recommendation-error">{error}</div>;
   if (!recommendation || recommendation.decks.length === 0) return <div className="empty-state">{emptyMessage ?? "No completed recommendation is available for this deck count."}</div>;
@@ -31,7 +54,15 @@ export default function RecommendationDecks({ recommendation, cards, loading, er
   const sortedDecks = [...recommendation.decks].sort(compareAverageDamage);
   return (
     <>
-      <div className="total-damage-card"><span>Total combined average damage</span><strong>{formatDamage(recommendation.total_average_damage)}</strong></div>
+      <div className="total-damage-card">
+        <span>
+          Total combined average damage
+          {(moralePercent > 0 || loyaltyPercent > 0) && (
+            <small>Morale {moralePercent}% × Loyalty {loyaltyPercent}%</small>
+          )}
+        </span>
+        <strong>{formatDamage(recommendation.total_average_damage, damageMultiplier)}</strong>
+      </div>
       <div className="recommendation-grid">
         {sortedDecks.map((deck, index) => {
           const pattern = deck.result?.best_pattern;
@@ -49,9 +80,9 @@ export default function RecommendationDecks({ recommendation, cards, loading, er
               </div>
               <dl className="deck-metrics">
                 <div className="pattern-row"><dt>Attack pattern</dt><dd>{pattern?.pattern ?? "Unavailable"}</dd></div>
-                <div><dt>Average</dt><dd>{formatDamage(pattern?.average_damage ?? deck.average_damage)}</dd></div>
-                <div><dt>Lowest</dt><dd>{formatDamage(pattern?.lowest_round_damage)}</dd></div>
-                <div><dt>Highest</dt><dd>{formatDamage(pattern?.highest_round_damage)}</dd></div>
+                <div><dt>Average</dt><dd>{formatDamage(pattern?.average_damage ?? deck.average_damage, damageMultiplier)}</dd></div>
+                <div><dt>Lowest</dt><dd>{formatDamage(pattern?.lowest_round_damage, damageMultiplier)}</dd></div>
+                <div><dt>Highest</dt><dd>{formatDamage(pattern?.highest_round_damage, damageMultiplier)}</dd></div>
               </dl>
             </article>
           );

@@ -22,6 +22,8 @@ const deckCountOptions = Array.from(
 );
 const errorMessage = (error: unknown, fallback: string) =>
   error instanceof ApiError ? error.message : fallback;
+const clampPercent = (value: number, maximum: number) =>
+  Number.isFinite(value) ? Math.min(maximum, Math.max(0, value)) : 0;
 
 export default function PlayerRecommendations() {
   const { playerId = "" } = useParams();
@@ -33,6 +35,8 @@ export default function PlayerRecommendations() {
   const [deckCount, setDeckCount] = useState(DEFAULT_DECK_COUNT);
   const [mustIncludeMirrorForce, setMustIncludeMirrorForce] = useState(false);
   const [mustIncludeTeamTactics, setMustIncludeTeamTactics] = useState(false);
+  const [moralePercent, setMoralePercent] = useState(0);
+  const [loyaltyPercent, setLoyaltyPercent] = useState(34);
   const [recommendations, setRecommendations] = useState<
     Record<number, Recommendation | null>
   >({ [DEFAULT_DECK_COUNT]: null });
@@ -49,6 +53,7 @@ export default function PlayerRecommendations() {
   const recommendationsInitializedRef = useRef(false);
   const generatedDeckCountsRef = useRef(new Set<number>());
   const pendingScrollPositionRef = useRef<number | null>(null);
+  const damageMultiplier = (1 + moralePercent / 100) * (1 + loyaltyPercent / 100);
 
   const loadRecommendations = useCallback(async () => {
     const requestId = ++recommendationRequestRef.current;
@@ -248,6 +253,30 @@ export default function PlayerRecommendations() {
               <p className="panel-desc">Cards are unique across the optimized lineup.</p>
             </div>
             <div className="recommendation-controls">
+              <div className="damage-modifier-controls">
+                <label className="damage-percent-control">
+                  <span>Morale %</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={moralePercent}
+                    onChange={(event) => setMoralePercent(clampPercent(event.currentTarget.valueAsNumber, 100))}
+                  />
+                </label>
+                <label className="damage-percent-control">
+                  <span>Loyalty %</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={34}
+                    step={1}
+                    value={loyaltyPercent}
+                    onChange={(event) => setLoyaltyPercent(clampPercent(event.currentTarget.valueAsNumber, 34))}
+                  />
+                </label>
+              </div>
               <label className="required-cards-toggle">
                 <input
                   type="checkbox"
@@ -284,6 +313,9 @@ export default function PlayerRecommendations() {
             cards={cards}
             loading={recommendationsLoading || generatingRecommendation}
             error={recommendationErrors[deckCount] ?? ""}
+            damageMultiplier={damageMultiplier}
+            moralePercent={moralePercent}
+            loyaltyPercent={loyaltyPercent}
             emptyMessage={
               generatingRecommendation
                 ? `Generating the best ${deckCount}-deck recommendations from the latest simulation...`

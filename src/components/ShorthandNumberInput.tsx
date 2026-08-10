@@ -9,6 +9,7 @@ interface Props {
   integer?: boolean;
   className?: string;
   ariaLabel?: string;
+  disabled?: boolean;
 }
 
 function constrainValue(
@@ -31,6 +32,7 @@ export default function ShorthandNumberInput({
   integer = false,
   className,
   ariaLabel,
+  disabled = false,
 }: Props) {
   const [draft, setDraft] = useState(formatShorthandNumber(value));
   const [invalid, setInvalid] = useState(false);
@@ -69,6 +71,7 @@ export default function ShorthandNumberInput({
       className={className}
       aria-label={ariaLabel}
       aria-invalid={invalid || undefined}
+      disabled={disabled}
       title="Accepts numbers such as 22.52B, 1.5M, 2e6, or 1,000"
       value={draft}
       onFocus={() => {

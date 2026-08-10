@@ -19,6 +19,8 @@ export const makeDefaultBoss = (): CurrentBoss => {
     boss_data: {
       boss_name: "Lojak",
       global_raid_modifier: "None",
+      curse_type: "None",
+      recommend_1_to_2_part_patterns_only: false,
       head: part("Head"),
       torso: part("Torso"),
       left_shoulder: part("LeftShoulder"),

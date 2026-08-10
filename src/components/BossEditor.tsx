@@ -3,13 +3,14 @@ import type {
   BossName,
   BossPart,
   BossPartName,
+  CurseType,
   CurrentBoss,
   GlobalRaidModifier,
   PartState,
 } from "../api/types";
 import ShorthandNumberInput from "./ShorthandNumberInput";
 
-type BossPartKey = Exclude<keyof BossData, "boss_name" | "global_raid_modifier" | "damage_results">;
+type BossPartKey = Exclude<keyof BossData, "boss_name" | "global_raid_modifier" | "curse_type" | "recommend_1_to_2_part_patterns_only" | "damage_results">;
 
 const PARTS: Array<{ key: BossPartKey; name: BossPartName; label: string }> = [
   { key: "head", name: "Head", label: "Head" },
@@ -37,6 +38,27 @@ const GLOBAL_RAID_MODIFIERS: Array<{ value: GlobalRaidModifier; label: string }>
 const LEG_PARTS: BossPartKey[] = ["left_leg", "right_leg"];
 const ARM_PARTS: BossPartKey[] = ["left_shoulder", "right_shoulder", "left_hand", "right_hand"];
 
+const enforcePartStateValues = (part: BossPart): BossPart => {
+  switch (part.part_state) {
+    case "Armor":
+    case "Cursed":
+      return { ...part, current_health: part.max_health };
+    case "Body":
+      return { ...part, current_armor: 0 };
+    case "Skeleton":
+      return { ...part, current_armor: 0, current_health: 0 };
+  }
+};
+
+const isStateControlledCurrentField = (
+  state: PartState,
+  field: keyof Pick<BossPart, "current_armor" | "current_health">,
+) => {
+  if (state === "Skeleton") return true;
+  if (field === "current_armor") return state === "Body";
+  return state === "Armor" || state === "Cursed";
+};
+
 interface Props {
   value: CurrentBoss;
   onChange: (value: CurrentBoss) => void;
@@ -45,10 +67,13 @@ interface Props {
 }
 
 export default function BossEditor({ value, onChange, onSave, saving }: Props) {
+  const cursedPartCount = PARTS.filter(({ key }) => value.boss_data[key].part_state === "Cursed").length;
+  const curseReductionPercent = cursedPartCount * 6;
   const updatePart = (key: BossPartKey, changes: Partial<BossPart>) => {
     const current = value.boss_data[key];
     if (!current || typeof current !== "object" || !("part_name" in current)) return;
-    onChange({ ...value, boss_data: { ...value.boss_data, [key]: { ...current, ...changes } } });
+    const nextPart = enforcePartStateValues({ ...current, ...changes });
+    onChange({ ...value, boss_data: { ...value.boss_data, [key]: nextPart } });
   };
   const toggleAttackable = (partName: BossPartName, checked: boolean) => {
     const attackable_parts = checked
@@ -67,7 +92,7 @@ export default function BossEditor({ value, onChange, onSave, saving }: Props) {
     const boss_data = { ...value.boss_data };
     keys.forEach((key) => {
       const part = boss_data[key] as BossPart;
-      boss_data[key] = { ...part, [field]: perPart };
+      boss_data[key] = enforcePartStateValues({ ...part, [field]: perPart });
     });
     onChange({ ...value, boss_data });
   };
@@ -75,11 +100,12 @@ export default function BossEditor({ value, onChange, onSave, saving }: Props) {
     const boss_data = { ...value.boss_data };
     PARTS.forEach(({ key }) => {
       const part = boss_data[key];
-      boss_data[key] = {
-        ...part,
-        current_armor: part.max_armor,
-        current_health: part.max_health,
-      };
+      const currentValues = part.part_state === "Skeleton"
+        ? { current_armor: 0, current_health: 0 }
+        : part.part_state === "Body"
+          ? { current_armor: 0, current_health: part.max_health }
+          : { current_armor: part.max_armor, current_health: part.max_health };
+      boss_data[key] = enforcePartStateValues({ ...part, ...currentValues });
     });
     onChange({ ...value, boss_data });
   };
@@ -103,6 +129,34 @@ export default function BossEditor({ value, onChange, onSave, saving }: Props) {
             {GLOBAL_RAID_MODIFIERS.map((modifier) => <option key={modifier.value} value={modifier.value}>{modifier.label}</option>)}
           </select>
           <small>Only one modifier can be active for the current boss.</small>
+        </label>
+        <label className="field">
+          <span>Curse type</span>
+          <select value={value.boss_data.curse_type ?? "None"} onChange={(event) => onChange({ ...value, boss_data: { ...value.boss_data, curse_type: event.target.value as CurseType } })}>
+            <option value="None">None</option>
+            <option value="BodyDamage">Body damage</option>
+            <option value="BurstDamage">Burst damage</option>
+            <option value="AfflictionDamage">Affliction damage</option>
+          </select>
+          <small>{cursedPartCount} cursed {cursedPartCount === 1 ? "part" : "parts"} = {curseReductionPercent}% damage reduction.</small>
+        </label>
+        <label className="field checkbox-field">
+          <span>Recommendation attack size</span>
+          <span>
+            <input
+              type="checkbox"
+              checked={value.boss_data.recommend_1_to_2_part_patterns_only ?? false}
+              onChange={(event) => onChange({
+                ...value,
+                boss_data: {
+                  ...value.boss_data,
+                  recommend_1_to_2_part_patterns_only: event.target.checked,
+                },
+              })}
+            />{" "}
+            Recommend only 1–2-part attack patterns
+          </span>
+          <small>Wide attack patterns are skipped during simulation when enabled.</small>
         </label>
       </div>
       <fieldset className="boss-group-helper">
@@ -141,7 +195,11 @@ export default function BossEditor({ value, onChange, onSave, saving }: Props) {
                   <th scope="row">{label}</th>
                   <td><select aria-label={`${label} state`} value={part.part_state} onChange={(event) => updatePart(key, { part_state: event.target.value as PartState })}>{(["Armor", "Body", "Cursed", "Skeleton"] as PartState[]).map((state) => <option key={state}>{state}</option>)}</select></td>
                   <td><input aria-label={`Target ${label}`} type="checkbox" checked={value.attackable_parts.includes(name)} onChange={(event) => toggleAttackable(name, event.target.checked)} /></td>
-                  {(["max_armor", "current_armor", "max_health", "current_health"] as const).map((field) => <td key={field}><ShorthandNumberInput ariaLabel={`${label} ${field.replace("_", " ")}`} min={0} integer value={part[field]} onValueChange={(nextValue) => updatePart(key, { [field]: nextValue })} /></td>)}
+                  {(["max_armor", "current_armor", "max_health", "current_health"] as const).map((field) => {
+                    const disabled = (field === "current_armor" || field === "current_health")
+                      && isStateControlledCurrentField(part.part_state, field);
+                    return <td key={field}><ShorthandNumberInput ariaLabel={`${label} ${field.replace("_", " ")}`} min={0} integer disabled={disabled} value={part[field]} onValueChange={(nextValue) => updatePart(key, { [field]: nextValue })} /></td>;
+                  })}
                 </tr>
               );
             })}

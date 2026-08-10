@@ -108,6 +108,10 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .recommendation-controls { display: flex; flex-direction: column; align-items: flex-end; gap: .6rem; }
+.damage-modifier-controls { display: flex; gap: .6rem; }
+.damage-percent-control { display: flex; align-items: center; gap: .4rem; color: var(--text-muted); font-size: .76rem; }
+.damage-percent-control input { width: 68px; min-height: 36px; padding: .4rem .5rem; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; outline: none; }
+.damage-percent-control input:focus { border-color: var(--accent); }
 .required-cards-toggle { display: flex; align-items: center; gap: .45rem; color: var(--text-muted); font-size: .76rem; cursor: pointer; }
 .required-cards-toggle input { accent-color: var(--accent); }
 .deck-count-control { display: flex; align-items: center; gap: .55rem; color: var(--text-muted); font-size: .76rem; }
@@ -115,6 +119,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .deck-count-control select:focus { border-color: var(--accent); }
 .total-damage-card { margin: .5rem 0 1.25rem; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: var(--accent-light); border: 1px solid #ead8cf; border-radius: 8px; }
 .total-damage-card span { color: var(--text-muted); font-size: .82rem; }
+.total-damage-card span small { display: block; margin-top: .2rem; font-size: .68rem; }
 .total-damage-card strong { color: var(--accent); font: 1.5rem "DM Serif Display", serif; }
 .recommendation-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .deck-card { padding: 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; }
@@ -184,7 +189,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .vault-card-body label { display: flex; align-items: center; gap: .35rem; color: var(--text-muted); font-size: .68rem; }
 .vault-card-input { min-width: 0; width: 100%; padding: .15rem .3rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
 
-.boss-options-grid { max-width: 620px; margin-bottom: 1rem; display: grid; grid-template-columns: minmax(160px, .7fr) minmax(260px, 1.3fr); gap: 1rem; }
+.boss-options-grid { margin-bottom: 1rem; display: grid; grid-template-columns: repeat(3, minmax(190px, 1fr)); gap: 1rem; }
 .boss-options-grid small { color: var(--text-muted); font-size: .68rem; font-weight: 400; }
 .boss-table-wrap { overflow-x: auto; }
 .boss-group-helper { margin: 1rem 0; padding: .85rem 1rem 1rem; border: 1px solid var(--border); border-radius: .75rem; }
@@ -232,6 +237,7 @@ input[aria-invalid="true"] { border-color: #b63e2a; }
   .job-meta { align-items: flex-start; }
   .recommendations-panel .panel-heading-row { align-items: stretch; }
   .recommendation-controls { align-items: stretch; }
+  .damage-modifier-controls { justify-content: space-between; }
   .deck-count-control { justify-content: space-between; }
   .deck-count-control select { flex: 1; }
   .total-damage-card { align-items: flex-start; flex-direction: column; }

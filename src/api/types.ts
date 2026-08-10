@@ -98,6 +98,7 @@ export type BossPartName =
   | "RightLeg";
 
 export type PartState = "Cursed" | "Armor" | "Body" | "Skeleton";
+export type CurseType = "None" | "BodyDamage" | "BurstDamage" | "AfflictionDamage";
 
 export type GlobalRaidModifier =
   | "None"
@@ -123,6 +124,8 @@ export interface BossPart {
 export interface BossData {
   boss_name: BossName;
   global_raid_modifier: GlobalRaidModifier;
+  curse_type: CurseType;
+  recommend_1_to_2_part_patterns_only: boolean;
   head: BossPart;
   torso: BossPart;
   left_shoulder: BossPart;

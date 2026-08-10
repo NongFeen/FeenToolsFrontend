@@ -196,7 +196,7 @@ export default function TapTitanAdmin() {
       <div className="layout admin-layout">
         <aside className="sidebar admin-sidebar" aria-label="Admin sections">
           <p className="sidebar-label">Admin</p>
-          {[ ["section-players", "Players"], ["section-import", "Import stats"], ["section-multipliers", "Multipliers"], ["section-titan-soul", "Titan Soul"], ["section-raid-card", "Raid Card"], ["section-gem-stone", "Gem Stone"], ["section-card-vault", "Card Vault"], ["section-boss", "Current Boss"], ["section-simulation", "Simulation"] ].map(([id, label]) => <button key={id} className="side-btn" type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}>{label}</button>)}
+          {[ ["section-players", "Players"], ["section-boss", "Current Boss"], ["section-simulation", "Simulation"], ["section-import", "Import stats"], ["section-multipliers", "Multipliers"], ["section-titan-soul", "Titan Soul"], ["section-raid-card", "Raid Card"], ["section-gem-stone", "Gem Stone"], ["section-card-vault", "Card Vault"] ].map(([id, label]) => <button key={id} className="side-btn" type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}>{label}</button>)}
         </aside>
         <main className="content">
           <div className="page-header admin-heading"><span className="eyebrow">Local debug controls</span><h1>Tap Titans Admin</h1><p>Create players and manage current-state stats, boss data, and simulations.</p></div>
@@ -223,6 +223,13 @@ export default function TapTitanAdmin() {
             </div>}
           </section>
 
+          <div className="section-gap"><BossEditor value={boss} onChange={setBoss} onSave={saveBoss} saving={busy === "boss"} /></div>
+          <section id="section-simulation" className="panel scroll-target section-gap">
+            <div className="panel-heading-row"><div><h2 className="panel-title">Selected-player Simulation</h2><p className="panel-desc">Force a simulation for only the selected player. Status refreshes every two seconds.</p></div><button className="calc-btn" type="button" disabled={!selectedPlayerId || busy === "force"} onClick={forceSimulation}>{busy === "force" ? "Queueing…" : "Force selected player run"}</button></div>
+            {forceError && <div className="error-box">{forceError}</div>}
+            <JobStatus job={forceJob} emptyMessage={forceJobId ? "Loading queued job…" : "No manually forced simulation in this session."} />
+          </section>
+
           <section className="panel scroll-target section-gap">
             <div className="panel-heading-row"><div><h2 className="panel-title">Latest TT2 Player Data</h2><p className="panel-desc">Socket: {tt2Status.connected ? "Connected" : tt2Status.configured ? "Disconnected" : "Not configured"}. Fetching immediately converts and saves a new stats revision.</p></div><button className="calc-btn" type="button" disabled={!selected || !selected.has_player_token || selected.player_token_status === "invalid" || !tt2Status.connected || busy === "fetch"} onClick={fetchLatestPlayerData}>{busy === "fetch" ? "Fetching…" : "Fetch latest player data"}</button></div>
             {selected?.tt2_last_fetched_at && <p className="panel-desc">Last fetch attempt: {new Date(selected.tt2_last_fetched_at).toLocaleString()}</p>}
@@ -238,12 +245,6 @@ export default function TapTitanAdmin() {
           {!statsLoading && stats && <><div className="save-bar"><div><strong>Editing {selected?.display_name}</strong><span>Changes remain local until saved.</span></div><button className="calc-btn" type="button" disabled={busy === "stats"} onClick={saveStats}>{busy === "stats" ? "Saving…" : "Save player stats"}</button></div><StatsEditor data={stats} cardDefinitions={cards} onChange={setStats} /></>}
           {!statsLoading && selectedPlayerId && !stats && <div className="panel empty-state section-gap">No cleaned stats loaded. Paste a raw export above.</div>}
 
-          <div className="section-gap"><BossEditor value={boss} onChange={setBoss} onSave={saveBoss} saving={busy === "boss"} /></div>
-          <section id="section-simulation" className="panel scroll-target section-gap">
-            <div className="panel-heading-row"><div><h2 className="panel-title">Selected-player Simulation</h2><p className="panel-desc">Force a simulation for only the selected player. Status refreshes every two seconds.</p></div><button className="calc-btn" type="button" disabled={!selectedPlayerId || busy === "force"} onClick={forceSimulation}>{busy === "force" ? "Queueing…" : "Force selected player run"}</button></div>
-            {forceError && <div className="error-box">{forceError}</div>}
-            <JobStatus job={forceJob} emptyMessage={forceJobId ? "Loading queued job…" : "No manually forced simulation in this session."} />
-          </section>
         </main>
       </div>
     </div>
