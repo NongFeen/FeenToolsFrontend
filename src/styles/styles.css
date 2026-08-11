@@ -531,11 +531,25 @@ button:disabled {
   font-weight: 600;
   line-height: 1.25;
 }
+.seasonal-level-inline {
+  margin-left: 0.08rem;
+  color: #62dc88;
+  font-weight: 700;
+}
 .deck-card .card-level-badge {
   padding: 0.15rem 0.4rem;
   right: 0.3rem;
   bottom: 0.3rem;
   font-size: 1rem;
+}
+.seasonal-boost-text,
+.seasonal-boost-inline {
+  color: #218346;
+  font-weight: 700;
+}
+.seasonal-boost-text {
+  display: block;
+  font-size: 0.68rem;
 }
 .card-damage-label {
   margin-top: 0.2rem;

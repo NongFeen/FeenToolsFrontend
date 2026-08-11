@@ -3,6 +3,7 @@ export interface CardDefinitionDto {
   name: string;
   type: string;
   image: string;
+  seasonal_level_boost: number;
 }
 
 export interface CardEntry {

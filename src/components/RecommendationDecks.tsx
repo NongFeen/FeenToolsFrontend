@@ -95,7 +95,7 @@ export default function RecommendationDecks({
                   return <span className="deck-image-wrap" key={cardId}>
                     <span className="card-art-wrap">
                       {definition?.image ? <img src={assetUrl(definition.image)} alt={alt} loading="lazy" /> : <span className="deck-image-missing" role="img" aria-label={`${alt} image unavailable`}>Image unavailable</span>}
-                      {level !== undefined && <small className="card-level-badge">Lv {level}</small>}
+                      {level !== undefined && <small className="card-level-badge">Lv {level}{Boolean(definition?.seasonal_level_boost) && <span className="seasonal-level-inline">+{definition!.seasonal_level_boost}</span>}</small>}
                     </span>
                     <small className="card-damage-label">{formatCompactDamage(cardDamage?.average_damage, damageMultiplier)}</small>
                   </span>;

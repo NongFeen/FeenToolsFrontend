@@ -21,6 +21,7 @@ export default function CardGrid({ cards, cardDefinitions, onCardLevelChange, on
             </div>
             <div className="vault-card-body">
               <p>{displayName}</p>
+              {Boolean(def?.seasonal_level_boost) && <small className="seasonal-boost-text">Seasonal +{def!.seasonal_level_boost} Lv</small>}
               <label className="vault-card-enabled">
                 <input
                   type="checkbox"

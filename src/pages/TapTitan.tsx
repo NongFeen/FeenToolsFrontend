@@ -577,6 +577,11 @@ export default function TapTitan() {
                                           {level !== undefined && (
                                             <small className="card-level-badge">
                                               Lv {level}
+                                              {Boolean(definition?.seasonal_level_boost) && (
+                                                <span className="seasonal-level-inline">
+                                                  +{definition!.seasonal_level_boost}
+                                                </span>
+                                              )}
                                             </small>
                                           )}
                                         </span>

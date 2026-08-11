@@ -146,7 +146,7 @@ export default function TapTitanDebug() {
                     const name = card.definition?.name ?? card.card_id;
                     return <button key={card.card_id} type="button" className={`debug-card-choice${selected ? " selected" : ""}`} aria-pressed={selected} onClick={() => toggleCard(card.card_id)} title={`${name}, level ${card.level}`}>
                       {card.definition?.image ? <img src={assetUrl(card.definition.image)} alt={name} /> : <span>?</span>}
-                      <small>Lv {card.level}</small>
+                      <small>Lv {card.level}{Boolean(card.definition?.seasonal_level_boost) && <span className="seasonal-boost-inline"> +{card.definition!.seasonal_level_boost}</span>}</small>
                     </button>;
                   })}
                 </div>
