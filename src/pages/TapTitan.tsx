@@ -18,6 +18,11 @@ interface PlayerRecommendationModes {
   combinedError?: string;
 }
 
+interface PreviewLayout {
+  placement: "above" | "below";
+  maxHeight: number;
+}
+
 const loadRecommendationOrNull = async (playerId: string, includeBodyPhase: boolean) => {
   try {
     const recommendation = await api.recommendation(playerId, 6, true, true, includeBodyPhase);
@@ -64,6 +69,15 @@ const formatDamage = (value: string) => {
     return value;
   }
 };
+const formatCompactDamage = (value: string) => {
+  const damage = Number(value);
+  if (!Number.isFinite(damage)) return formatDamage(value);
+  return new Intl.NumberFormat("en", {
+    notation: "compact",
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  }).format(damage);
+};
 
 export default function TapTitan() {
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
@@ -72,6 +86,7 @@ export default function TapTitan() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hoveredPlayerId, setHoveredPlayerId] = useState("");
+  const [previewLayout, setPreviewLayout] = useState<PreviewLayout>({ placement: "below", maxHeight: 480 });
   const [deckPreviews, setDeckPreviews] = useState<Record<string, DeckPreview>>({});
   const [clanRecommendations, setClanRecommendations] = useState<Record<string, PlayerRecommendationModes>>({});
   const [clanRecommendationsLoading, setClanRecommendationsLoading] = useState(true);
@@ -123,7 +138,15 @@ export default function TapTitan() {
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
   }, []);
 
-  const beginDeckPreview = (player: PlayerSummary) => {
+  const beginDeckPreview = (player: PlayerSummary, anchor: HTMLElement) => {
+    const bounds = anchor.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - bounds.bottom - 8;
+    const spaceAbove = bounds.top - 8;
+    const placement = spaceBelow >= spaceAbove ? "below" : "above";
+    setPreviewLayout({
+      placement,
+      maxHeight: Math.max(0, Math.floor(placement === "below" ? spaceBelow : spaceAbove)),
+    });
     setHoveredPlayerId(player.player_id);
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     if (deckPreviews[player.player_id]?.recommendation || deckPreviews[player.player_id]?.loading) return;
@@ -189,15 +212,15 @@ export default function TapTitan() {
           {!clanRecommendationsLoading && <>
             <div className="clan-summary-mode">
               <h2>Current boss only</h2>
-              <span>Combined average damage</span><strong>{formatDamage(currentSummary.totalDamage)}</strong>
-              <span>Average damage per deck</span><strong>{formatDamage(currentSummary.averagePerDeck)}</strong>
+              <span>Combined average damage</span><strong>{formatCompactDamage(currentSummary.totalDamage)}</strong>
+              <span>Average damage per deck</span><strong>{formatCompactDamage(currentSummary.averagePerDeck)}</strong>
               <small>{currentSummary.playersCalculated} / {players.length} players · {currentSummary.totalDecks} decks calculated{currentSummary.checksFailed > 0 ? ` · ${currentSummary.checksFailed} checks failed` : ""}</small>
             </div>
             <div className="clan-summary-mode body">
               <h2>Current + Body/Void phase</h2>
-              <span>Combined average damage</span><strong>{formatDamage(combinedSummary.totalDamage)}</strong>
-              <span>Average damage per deck</span><strong>{formatDamage(combinedSummary.averagePerDeck)}</strong>
-              <small>{combinedSummary.playersCalculated} / {players.length} players · {combinedSummary.totalDecks} decks calculated{combinedSummary.checksFailed > 0 ? ` · ${combinedSummary.checksFailed} checks failed` : ""}</small>
+              <span>Combined average damage</span><strong>{formatCompactDamage(combinedSummary.totalDamage)}</strong>
+              <span>Average damage per deck</span><strong>{formatCompactDamage(combinedSummary.averagePerDeck)}</strong>
+              <small>{combinedSummary.playersCalculated} / {players.length} players  {combinedSummary.checksFailed > 0 ? ` · ${combinedSummary.checksFailed} checks failed` : ""}</small>
             </div>
           </>}
         </section>
@@ -223,15 +246,19 @@ export default function TapTitan() {
               className="player-option"
               key={player.player_id}
               to={`/tools/taptitan/players/${encodeURIComponent(player.player_id)}`}
-              onMouseEnter={() => beginDeckPreview(player)}
+              onMouseEnter={(event) => beginDeckPreview(player, event.currentTarget)}
               onMouseLeave={endDeckPreview}
-              onFocus={() => beginDeckPreview(player)}
+              onFocus={(event) => beginDeckPreview(player, event.currentTarget)}
               onBlur={endDeckPreview}
             >
                   <div><h2>{player.display_name}</h2><p>{player.player_id}</p></div>
               <span className="arrow" aria-hidden="true">→</span>
               {hoveredPlayerId === player.player_id && (
-                <div className="player-deck-preview" role="status">
+                <div
+                  className={`player-deck-preview ${previewLayout.placement}`}
+                  role="status"
+                  style={{ maxHeight: previewLayout.maxHeight }}
+                >
                   <strong>Best 6 decks</strong>
                   <small>Mirror Force + Team Tactics</small>
                   {!deckPreviews[player.player_id] && <p>Loading preview…</p>}
