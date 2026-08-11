@@ -1,14 +1,36 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, ApiError } from "../api/client";
-import type { PlayerSummary } from "../api/types";
+import { api, ApiError, assetUrl } from "../api/client";
+import type { CardDefinition, PlayerSummary, Recommendation } from "../api/types";
 import Navbar from "../components/Navbar";
+
+interface DeckPreview {
+  loading: boolean;
+  recommendation?: Recommendation;
+  error?: string;
+}
+
+const readableCardName = (cardId: string) =>
+  cardId.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+const normalizeCardKey = (cardId: string) =>
+  cardId.toLocaleLowerCase().replace(/[^a-z0-9]/g, "");
+const formatDamage = (value: string) => {
+  try {
+    return BigInt(value.split(".")[0]).toLocaleString();
+  } catch {
+    return value;
+  }
+};
 
 export default function TapTitan() {
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
+  const [cards, setCards] = useState<CardDefinition[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [hoveredPlayerId, setHoveredPlayerId] = useState("");
+  const [deckPreviews, setDeckPreviews] = useState<Record<string, DeckPreview>>({});
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const normalizedSearch = search.trim().toLocaleLowerCase();
   const filteredPlayers = normalizedSearch
@@ -25,8 +47,52 @@ export default function TapTitan() {
       .then((data) => { if (active) setPlayers(data); })
       .catch((reason) => { if (active) setError(reason instanceof ApiError ? reason.message : "Failed to load players."); })
       .finally(() => { if (active) setLoading(false); });
+    api.cards().then((data) => { if (active) setCards(data); }).catch(() => undefined);
     return () => { active = false; };
   }, []);
+
+  const cardDefinitions = new Map(
+    cards.map((card) => [normalizeCardKey(card.id), card] as const),
+  );
+
+  useEffect(() => () => {
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+  }, []);
+
+  const beginDeckPreview = (player: PlayerSummary) => {
+    setHoveredPlayerId(player.player_id);
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    if (deckPreviews[player.player_id]?.recommendation || deckPreviews[player.player_id]?.loading) return;
+
+    previewTimerRef.current = setTimeout(() => {
+      setDeckPreviews((current) => ({
+        ...current,
+        [player.player_id]: { loading: true },
+      }));
+      api.recommendation(player.player_id, 6, true, true)
+        .then((recommendation) => setDeckPreviews((current) => ({
+          ...current,
+          [player.player_id]: { loading: false, recommendation },
+        })))
+        .catch((reason) => setDeckPreviews((current) => ({
+          ...current,
+          [player.player_id]: {
+            loading: false,
+            error: reason instanceof ApiError && reason.status === 404
+              ? "No six-deck recommendation is ready."
+              : reason instanceof ApiError
+                ? reason.message
+                : "Could not load deck preview.",
+          },
+        })));
+    }, 300);
+  };
+
+  const endDeckPreview = () => {
+    setHoveredPlayerId("");
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = null;
+  };
 
   return (
     <div className="page">
@@ -55,7 +121,15 @@ export default function TapTitan() {
         )}
         <div className="player-grid">
           {filteredPlayers.map((player) => (
-            <Link className="player-option" key={player.player_id} to={`/tools/taptitan/players/${encodeURIComponent(player.player_id)}`}>
+            <Link
+              className="player-option"
+              key={player.player_id}
+              to={`/tools/taptitan/players/${encodeURIComponent(player.player_id)}`}
+              onMouseEnter={() => beginDeckPreview(player)}
+              onMouseLeave={endDeckPreview}
+              onFocus={() => beginDeckPreview(player)}
+              onBlur={endDeckPreview}
+            >
               <div><h2>{player.display_name}</h2><p>{player.player_id}</p></div>
               <span
                 className={`status-dot ${player.stats_revision === null ? "off" : "on"}`}
@@ -63,6 +137,50 @@ export default function TapTitan() {
                 aria-label={player.stats_revision === null ? "Deck not ready" : "Deck ready"}
               />
               <span className="arrow" aria-hidden="true">→</span>
+              {hoveredPlayerId === player.player_id && (
+                <div className="player-deck-preview" role="status">
+                  <strong>Best 6 decks</strong>
+                  <small>Mirror Force + Team Tactics</small>
+                  {!deckPreviews[player.player_id] && <p>Loading preview…</p>}
+                  {deckPreviews[player.player_id]?.loading && <p>Loading preview…</p>}
+                  {deckPreviews[player.player_id]?.error && <p>{deckPreviews[player.player_id].error}</p>}
+                  {deckPreviews[player.player_id]?.recommendation && (
+                    <>
+                      <small className="preview-total-damage">
+                        Total avg dmg: {formatDamage(deckPreviews[player.player_id]!.recommendation!.total_average_damage)}
+                      </small>
+                      <ol>
+                      {[...deckPreviews[player.player_id]!.recommendation!.decks]
+                        .sort((left, right) => left.position - right.position)
+                        .slice(0, 6)
+                        .map((deck, index) => {
+                          const cards = deck.cards?.length ? deck.cards : deck.result?.deck ?? [];
+                          return (
+                            <li key={`${deck.position}-${index}`}>
+                              <span className="preview-deck-cards">
+                                {cards.slice(0, 3).map((cardId) => {
+                                  const definition = cardDefinitions.get(normalizeCardKey(cardId));
+                                  const cardName = definition?.name ?? readableCardName(cardId);
+                                  return definition?.image ? (
+                                    <img
+                                      key={cardId}
+                                      src={assetUrl(definition.image)}
+                                      alt={cardName}
+                                      title={cardName}
+                                    />
+                                  ) : (
+                                    <span key={cardId} role="img" aria-label={`${cardName} image unavailable`}>?</span>
+                                  );
+                                })}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </>
+                  )}
+                </div>
+              )}
             </Link>
           ))}
         </div>
