@@ -73,10 +73,13 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .compact-empty { padding: 1rem; }
 .muted-copy { margin-top: 1rem; color: var(--text-muted); font-size: .85rem; }
 
-.player-grid { display: grid; gap: .85rem; }
-.player-option { min-height: 92px; padding: 1rem 1.25rem; display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition); }
+.player-search { display: block; margin-bottom: .75rem; }
+.player-search input { width: 100%; min-height: 40px; padding: .55rem .8rem; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; outline: none; }
+.player-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+.player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: .5rem; }
+.player-option { min-height: 58px; padding: .65rem .85rem; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: .75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition); }
 .player-option:hover { border-color: #d5c8bf; box-shadow: 0 8px 24px rgba(45, 37, 30, .06); transform: translateY(-1px); }
-.player-option h2 { font-size: 1.15rem; }
+.player-option h2 { font-size: .95rem; }
 .player-option p { color: var(--text-muted); font-size: .78rem; }
 .player-avatar { width: 46px; height: 46px; display: grid; place-items: center; flex: 0 0 auto; color: var(--accent); background: var(--accent-light); border: 1px solid #ead8cf; border-radius: 50%; font: 1.25rem "DM Serif Display", serif; }
 .player-avatar.large { width: 62px; height: 62px; font-size: 1.65rem; }
@@ -150,6 +153,20 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .field-grid { display: grid; grid-template-columns: minmax(180px, .4fr) 1fr; gap: 1.25rem; align-items: start; }
 .create-player-form { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: .8rem; align-items: end; }
 .selection-row { margin-top: 1.5rem; padding-top: 1.5rem; display: grid; grid-template-columns: 1fr auto; gap: .8rem; align-items: end; border-top: 1px solid var(--border); }
+.batch-simulation-section { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+.batch-simulation-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.batch-simulation-heading h3 { font-size: .95rem; }
+.batch-simulation-actions { display: flex; gap: .6rem; }
+.simulation-player-list { margin: 1rem 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .55rem; }
+.simulation-player-option { padding: .65rem .75rem; display: flex; align-items: center; gap: .6rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+.simulation-player-option input { flex: 0 0 auto; accent-color: var(--accent); }
+.simulation-player-option span { min-width: 0; display: flex; flex-direction: column; }
+.simulation-player-option strong, .simulation-player-option small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.simulation-player-option strong { font-size: .8rem; }
+.simulation-player-option small { color: var(--text-muted); font-size: .68rem; }
+.simulation-player-option.disabled { opacity: .55; cursor: not-allowed; }
+.clan-fetch-status { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: .55rem 1.25rem; color: var(--text-muted); font-size: .76rem; }
+.clan-fetch-status strong { color: var(--text); }
 .check-row { display: flex; align-items: center; gap: .45rem; color: var(--text); font-size: .8rem; font-weight: 400; }
 .check-row input { accent-color: var(--accent); }
 .form-check { min-height: 40px; }
@@ -181,12 +198,15 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .inline-input-wrap { display: flex; align-items: center; color: var(--text-muted); }
 .card-vault-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)); gap: .8rem; }
 .vault-card { overflow: hidden; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+.vault-card-disabled { border-color: #c9c4bb; background: #f0eee9; }
 .vault-card-image-wrap { width: 100%; aspect-ratio: 1; display: grid; place-items: center; background: #efede7; }
 .vault-card-image-wrap img { width: 100%; height: 100%; object-fit: contain; }
 .image-placeholder { padding: .4rem; color: var(--text-muted); text-align: center; font-size: .65rem; }
 .vault-card-body { padding: .65rem; }
 .vault-card-body p { min-height: 2.1rem; font-size: .72rem; font-weight: 600; line-height: 1.35; }
 .vault-card-body label { display: flex; align-items: center; gap: .35rem; color: var(--text-muted); font-size: .68rem; }
+.vault-card-body .vault-card-enabled { margin-bottom: .45rem; color: var(--text); font-weight: 600; }
+.vault-card-enabled input { accent-color: var(--accent); }
 .vault-card-input { min-width: 0; width: 100%; padding: .15rem .3rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
 
 .boss-options-grid { margin-bottom: 1rem; display: grid; grid-template-columns: repeat(3, minmax(190px, 1fr)); gap: 1rem; }
@@ -228,9 +248,7 @@ input[aria-invalid="true"] { border-color: #b63e2a; }
   .panel { padding: 1.2rem; }
   .panel-heading-row { flex-direction: column; }
   .panel-heading-row > .calc-btn { width: 100%; }
-  .player-option { grid-template-columns: auto 1fr auto; }
-  .player-option-meta { grid-column: 2; }
-  .arrow { grid-column: 3; grid-row: 1 / 3; }
+  .player-option { grid-template-columns: 1fr auto auto; }
   .profile-facts { grid-template-columns: 1fr; gap: .55rem; }
   .profile-facts div { padding: 0; }
   .job-status { grid-template-columns: 1fr; }
@@ -244,6 +262,8 @@ input[aria-invalid="true"] { border-color: #b63e2a; }
   .total-damage-card strong { font-size: 1.15rem; overflow-wrap: anywhere; }
   .create-player-form, .selection-row, .field-grid, .boss-options-grid, .boss-group-helper-grid { grid-template-columns: 1fr; }
   .boss-group-helper-heading { align-items: stretch; flex-direction: column; }
+  .batch-simulation-heading, .batch-simulation-actions { align-items: stretch; flex-direction: column; }
+  .batch-simulation-actions button { width: 100%; }
   .create-player-form .calc-btn, .selection-row .secondary-btn { width: 100%; }
   .save-bar { position: static; align-items: stretch; flex-direction: column; }
   .stat-grid-layout { grid-template-columns: 1fr; }

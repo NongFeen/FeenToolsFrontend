@@ -38,6 +38,7 @@ export interface PlayerCard {
   card_id: string;
   cardtype: string;
   level: number;
+  enabled?: boolean;
 }
 
 export interface PlayerRaidData {
@@ -61,6 +62,25 @@ export interface PlayerStatsVersion {
 export interface Tt2PlayerStatus {
   configured: boolean;
   connected: boolean;
+  raid_connected: boolean;
+}
+
+export interface Tt2ClanStatus {
+  clan_code: string | null;
+  clan_name: string | null;
+  last_fetched_at: string | null;
+  next_fetch_at: string | null;
+  last_player_count: number;
+}
+
+export interface Tt2ClanFetchResult {
+  clan_code: string;
+  clan_name: string;
+  created_players: number;
+  updated_players: number;
+  player_count: number;
+  last_fetched_at: string;
+  next_fetch_at: string;
 }
 
 export interface SimulationJob {

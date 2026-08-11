@@ -46,8 +46,13 @@ export default function StatsEditor({ data, cardDefinitions, onChange }: StatsEd
       <GroupedStatSectionPanel id="section-gem-stone" title="Gem Stone Research Bonus" description="Talent stone progression attributes grouped by scaling category." stats={data.gem_stone_research} structureGroups={CARD_AND_GEM_GROUPS} onChange={(key, value) => onChange({ ...data, gem_stone_research: { ...data.gem_stone_research, [key]: value } })} />
       <section id="section-card-vault" className="panel scroll-target">
         <h2 className="panel-title">Card Vault Deck</h2>
-        <p className="panel-desc">Edit the current level of every imported card.</p>
-        <CardGrid cards={data.card_list} cardDefinitions={cardDefinitions} onCardLevelChange={(cardId, level) => onChange({ ...data, card_list: data.card_list.map((card) => card.card_id === cardId ? { ...card, level } : card) })} />
+        <p className="panel-desc">Choose which cards the simulator may use and edit their current levels. {data.card_list.filter((card) => card.enabled !== false).length} of {data.card_list.length} cards enabled.</p>
+        <CardGrid
+          cards={data.card_list}
+          cardDefinitions={cardDefinitions}
+          onCardLevelChange={(cardId, level) => onChange({ ...data, card_list: data.card_list.map((card) => card.card_id === cardId ? { ...card, level } : card) })}
+          onCardEnabledChange={(cardId, enabled) => onChange({ ...data, card_list: data.card_list.map((card) => card.card_id === cardId ? { ...card, enabled } : card) })}
+        />
       </section>
     </div>
   );

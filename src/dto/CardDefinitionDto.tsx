@@ -9,6 +9,7 @@ export interface CardEntry {
   card_id: string;
   cardtype: string;
   level: number;
+  enabled?: boolean;
 }
 
 export interface PlayerData {

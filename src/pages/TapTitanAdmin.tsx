@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
-import type { CardDefinition, CurrentBoss, PlayerRaidData, PlayerSummary, SimulationJob, Tt2PlayerStatus } from "../api/types";
+import type { CardDefinition, CurrentBoss, PlayerRaidData, PlayerSummary, SimulationJob, Tt2ClanStatus, Tt2PlayerStatus } from "../api/types";
 import BossEditor from "../components/BossEditor";
 import JobStatus from "../components/JobStatus";
 import Navbar from "../components/Navbar";
@@ -18,7 +18,9 @@ export default function TapTitanAdmin() {
   const [boss, setBoss] = useState<CurrentBoss>(makeDefaultBoss);
   const [createForm, setCreateForm] = useState({ player_id: "", display_name: "", player_token: "", auto_sims: false });
   const [playerToken, setPlayerToken] = useState("");
-  const [tt2Status, setTt2Status] = useState<Tt2PlayerStatus>({ configured: false, connected: false });
+  const [tt2Status, setTt2Status] = useState<Tt2PlayerStatus>({ configured: false, connected: false, raid_connected: false });
+  const [tt2ClanStatus, setTt2ClanStatus] = useState<Tt2ClanStatus | null>(null);
+  const [elapsedClanCooldown, setElapsedClanCooldown] = useState<string | null>(null);
   const [rawInput, setRawInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -28,6 +30,7 @@ export default function TapTitanAdmin() {
   const [forceJobId, setForceJobId] = useState("");
   const [forceJob, setForceJob] = useState<SimulationJob | null>(null);
   const [forceError, setForceError] = useState("");
+  const [simulationPlayerIds, setSimulationPlayerIds] = useState<string[]>([]);
 
   const refreshPlayers = useCallback(async () => {
     const list = await api.players();
@@ -37,7 +40,7 @@ export default function TapTitanAdmin() {
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([api.players(), api.cards(), api.currentBoss(), api.tt2PlayerStatus()]).then(([playersResult, cardsResult, bossResult, tt2Result]) => {
+    Promise.allSettled([api.players(), api.cards(), api.currentBoss(), api.tt2PlayerStatus(), api.tt2ClanStatus()]).then(([playersResult, cardsResult, bossResult, tt2Result, clanStatusResult]) => {
       if (!active) return;
       if (playersResult.status === "fulfilled") setPlayers(playersResult.value);
       else setError(messageFor(playersResult.reason, "Could not load players."));
@@ -52,6 +55,7 @@ export default function TapTitanAdmin() {
       });
       else if (!(bossResult.reason instanceof ApiError && bossResult.reason.status === 404)) setError(messageFor(bossResult.reason, "Could not load current boss."));
       if (tt2Result.status === "fulfilled") setTt2Status(tt2Result.value);
+      if (clanStatusResult.status === "fulfilled") setTt2ClanStatus(clanStatusResult.value);
       setLoading(false);
     });
     return () => { active = false; };
@@ -77,6 +81,14 @@ export default function TapTitanAdmin() {
     const timeoutId = window.setTimeout(() => setNotice(""), 5_000);
     return () => window.clearTimeout(timeoutId);
   }, [notice]);
+
+  useEffect(() => {
+    const nextFetchAt = tt2ClanStatus?.next_fetch_at;
+    if (!nextFetchAt) return;
+    const delay = Math.max(0, new Date(nextFetchAt).getTime() - Date.now());
+    const timeoutId = window.setTimeout(() => setElapsedClanCooldown(nextFetchAt), delay);
+    return () => window.clearTimeout(timeoutId);
+  }, [tt2ClanStatus?.next_fetch_at]);
 
   usePolling({
     enabled: Boolean(forceJobId) && (!forceJob || isActiveJob(forceJob)),
@@ -138,6 +150,34 @@ export default function TapTitanAdmin() {
     } finally { setBusy(""); }
   };
 
+  const fetchClanPlayerData = async () => {
+    resetMessages();
+    if (!selectedPlayerId) { setError("Select the clan Master or Grand Master player first."); return; }
+    setBusy("fetch-clan");
+    try {
+      const result = await api.fetchClanStats(selectedPlayerId);
+      setTt2ClanStatus({
+        clan_code: result.clan_code,
+        clan_name: result.clan_name,
+        last_fetched_at: result.last_fetched_at,
+        next_fetch_at: result.next_fetch_at,
+        last_player_count: result.player_count,
+      });
+      await refreshPlayers();
+      try {
+        const selectedStats = await api.currentStats(selectedPlayerId);
+        setStats({ ...selectedStats.stats, title: selectedStats.stats.title ?? 0 });
+      } catch { /* The selected token owner may no longer be returned as a clan member. */ }
+      setNotice(`Clan data updated for ${result.clan_name}: ${result.created_players} players created and ${result.updated_players} updated.`);
+    } catch (reason) {
+      setError(messageFor(reason, "Could not fetch TT2 clan player data."));
+      Promise.allSettled([api.tt2PlayerStatus(), api.tt2ClanStatus()]).then(([socketResult, clanResult]) => {
+        if (socketResult.status === "fulfilled") setTt2Status(socketResult.value);
+        if (clanResult.status === "fulfilled") setTt2ClanStatus(clanResult.value);
+      });
+    } finally { setBusy(""); }
+  };
+
   const importRawData = async () => {
     resetMessages();
     if (!selectedPlayerId) { setError("Select an existing player before importing stats."); return; }
@@ -187,7 +227,47 @@ export default function TapTitanAdmin() {
     finally { setBusy(""); }
   };
 
+  const simulationEligiblePlayers = players.filter((player) => player.stats_revision !== null);
+  const allSimulationPlayersSelected = simulationEligiblePlayers.length > 0
+    && simulationEligiblePlayers.every((player) => simulationPlayerIds.includes(player.player_id));
+
+  const toggleSimulationPlayer = (playerId: string, checked: boolean) => {
+    setSimulationPlayerIds((current) => checked
+      ? [...new Set([...current, playerId])]
+      : current.filter((id) => id !== playerId));
+  };
+
+  const toggleAllSimulationPlayers = () => {
+    setSimulationPlayerIds(allSimulationPlayersSelected
+      ? []
+      : simulationEligiblePlayers.map((player) => player.player_id));
+  };
+
+  const runSelectedPlayerSimulations = async () => {
+    resetMessages(); setForceError("");
+    const selectedIds = simulationPlayerIds.filter((playerId) =>
+      simulationEligiblePlayers.some((player) => player.player_id === playerId));
+    if (selectedIds.length === 0) { setError("Select at least one player with saved stats."); return; }
+    setBusy("force-all");
+    try {
+      const results = await Promise.allSettled(selectedIds.map((playerId) => api.createSimulation(playerId)));
+      const succeeded = results.filter((result) => result.status === "fulfilled");
+      const created = succeeded.filter((result) => result.status === "fulfilled" && result.value.created).length;
+      const existing = succeeded.length - created;
+      const failed = results.length - succeeded.length;
+      setNotice(`${created} simulation${created === 1 ? "" : "s"} queued${existing > 0 ? `; ${existing} existing job${existing === 1 ? "" : "s"} already tracked` : ""}.`);
+      if (failed > 0) {
+        const failureMessages = results.flatMap((result, index) => result.status === "rejected"
+          ? [`${players.find((player) => player.player_id === selectedIds[index])?.display_name ?? selectedIds[index]}: ${messageFor(result.reason, "Could not queue simulation.")}`]
+          : []);
+        setError(`${failed} selected player simulation${failed === 1 ? "" : "s"} could not be queued. ${failureMessages.join(" ")}`);
+      }
+    } finally { setBusy(""); }
+  };
+
   const selected = players.find((player) => player.player_id === selectedPlayerId);
+  const clanNextFetchAt = tt2ClanStatus?.next_fetch_at ? new Date(tt2ClanStatus.next_fetch_at) : null;
+  const clanFetchCoolingDown = Boolean(tt2ClanStatus?.next_fetch_at && elapsedClanCooldown !== tt2ClanStatus.next_fetch_at);
   if (loading) return <div className="page"><Navbar /><main className="page-shell"><div className="panel empty-state">Loading admin tools…</div></main></div>;
 
   return (
@@ -225,7 +305,28 @@ export default function TapTitanAdmin() {
 
           <div className="section-gap"><BossEditor value={boss} onChange={setBoss} onSave={saveBoss} saving={busy === "boss"} /></div>
           <section id="section-simulation" className="panel scroll-target section-gap">
-            <div className="panel-heading-row"><div><h2 className="panel-title">Selected-player Simulation</h2><p className="panel-desc">Force a simulation for only the selected player. Status refreshes every two seconds.</p></div><button className="calc-btn" type="button" disabled={!selectedPlayerId || busy === "force"} onClick={forceSimulation}>{busy === "force" ? "Queueing…" : "Force selected player run"}</button></div>
+            <div className="panel-heading-row"><div><h2 className="panel-title">Selected-player Simulation</h2><p className="panel-desc">Force a simulation for only the selected player. Status refreshes every two seconds.</p></div><button className="calc-btn" type="button" disabled={!selectedPlayerId || busy === "force" || busy === "force-all"} onClick={forceSimulation}>{busy === "force" ? "Queueing…" : "Force selected player run"}</button></div>
+            <div className="batch-simulation-section">
+              <div className="batch-simulation-heading">
+                <div><h3>Run multiple players</h3><p className="panel-desc">Select players with saved stats, then queue one simulation for each.</p></div>
+                <div className="batch-simulation-actions">
+                  <button className="secondary-btn" type="button" disabled={simulationEligiblePlayers.length === 0 || busy === "force-all" || busy === "force"} onClick={toggleAllSimulationPlayers}>{allSimulationPlayersSelected ? "Clear all" : "Select all players"}</button>
+                  <button className="calc-btn" type="button" disabled={simulationPlayerIds.length === 0 || busy === "force-all" || busy === "force"} onClick={runSelectedPlayerSimulations}>{busy === "force-all" ? "Queueing players…" : `Run selected players (${simulationPlayerIds.length})`}</button>
+                </div>
+              </div>
+              <div className="simulation-player-list">
+                {players.map((player) => {
+                  const canSimulate = player.stats_revision !== null;
+                  return (
+                    <label key={player.player_id} className={`simulation-player-option${canSimulate ? "" : " disabled"}`}>
+                      <input type="checkbox" disabled={!canSimulate || busy === "force-all" || busy === "force"} checked={canSimulate && simulationPlayerIds.includes(player.player_id)} onChange={(event) => toggleSimulationPlayer(player.player_id, event.target.checked)} />
+                      <span><strong>{player.display_name}</strong><small>{canSimulate ? player.player_id : "No saved stats"}</small></span>
+                    </label>
+                  );
+                })}
+                {players.length === 0 && <p className="panel-desc">No players are available.</p>}
+              </div>
+            </div>
             {forceError && <div className="error-box">{forceError}</div>}
             <JobStatus job={forceJob} emptyMessage={forceJobId ? "Loading queued job…" : "No manually forced simulation in this session."} />
           </section>
@@ -233,6 +334,29 @@ export default function TapTitanAdmin() {
           <section className="panel scroll-target section-gap">
             <div className="panel-heading-row"><div><h2 className="panel-title">Latest TT2 Player Data</h2><p className="panel-desc">Socket: {tt2Status.connected ? "Connected" : tt2Status.configured ? "Disconnected" : "Not configured"}. Fetching immediately converts and saves a new stats revision.</p></div><button className="calc-btn" type="button" disabled={!selected || !selected.has_player_token || selected.player_token_status === "invalid" || !tt2Status.connected || busy === "fetch"} onClick={fetchLatestPlayerData}>{busy === "fetch" ? "Fetching…" : "Fetch latest player data"}</button></div>
             {selected?.tt2_last_fetched_at && <p className="panel-desc">Last fetch attempt: {new Date(selected.tt2_last_fetched_at).toLocaleString()}</p>}
+          </section>
+
+          <section className="panel scroll-target section-gap">
+            <div className="panel-heading-row">
+              <div>
+                <h2 className="panel-title">TT2 Clan Player Data</h2>
+                <p className="panel-desc">Select a clan Master or Grand Master with a configured token. This creates missing clan players and refreshes every returned player’s stats.</p>
+              </div>
+              <button
+                className="calc-btn"
+                type="button"
+                disabled={!selected || !selected.has_player_token || selected.player_token_status === "invalid" || !tt2Status.raid_connected || clanFetchCoolingDown || busy === "fetch-clan"}
+                onClick={fetchClanPlayerData}
+              >
+                {busy === "fetch-clan" ? "Fetching clan…" : "Fetch clan player data"}
+              </button>
+            </div>
+            <div className="clan-fetch-status">
+              <span>Raid socket: <strong>{tt2Status.raid_connected ? "Connected" : tt2Status.configured ? "Disconnected" : "Not configured"}</strong></span>
+              {tt2ClanStatus?.clan_name && <span>Last clan: <strong>{tt2ClanStatus.clan_name} ({tt2ClanStatus.clan_code})</strong></span>}
+              {tt2ClanStatus?.last_fetched_at && <span>Last update: <strong>{new Date(tt2ClanStatus.last_fetched_at).toLocaleString()}</strong> ({tt2ClanStatus.last_player_count} players)</span>}
+              {clanFetchCoolingDown && clanNextFetchAt && <span>Available again: <strong>{clanNextFetchAt.toLocaleString()}</strong></span>}
+            </div>
           </section>
 
           <section id="section-import" className="panel scroll-target section-gap">

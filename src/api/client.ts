@@ -15,6 +15,8 @@ import type {
   RecommendationGenerationResponse,
   SimulationJob,
   Tt2PlayerStatus,
+  Tt2ClanStatus,
+  Tt2ClanFetchResult,
 } from "./types";
 
 const baseUrl = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -117,6 +119,14 @@ export const api = {
     ),
   tt2PlayerStatus: () =>
     request<Tt2PlayerStatus>("/internal/tt2/player-status", {}, true),
+  tt2ClanStatus: () =>
+    request<Tt2ClanStatus>("/internal/tt2/clan-status", {}, true),
+  fetchClanStats: (playerId: string) =>
+    request<Tt2ClanFetchResult>(
+      `/internal/players/${encodeURIComponent(playerId)}/fetch-clan-stats`,
+      { method: "POST" },
+      true,
+    ),
   playerJobs: (playerId: string) =>
     request<SimulationJob[]>(`${playerPath(playerId)}/simulation-jobs`),
   currentBoss: () => request<CurrentBoss>("/api/current-boss"),

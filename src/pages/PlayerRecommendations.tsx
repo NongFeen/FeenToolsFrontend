@@ -33,8 +33,8 @@ export default function PlayerRecommendations() {
   const [latestJob, setLatestJob] = useState<SimulationJob | null>(null);
   const [jobsReady, setJobsReady] = useState(false);
   const [deckCount, setDeckCount] = useState(DEFAULT_DECK_COUNT);
-  const [mustIncludeMirrorForce, setMustIncludeMirrorForce] = useState(false);
-  const [mustIncludeTeamTactics, setMustIncludeTeamTactics] = useState(false);
+  const [mustIncludeMirrorForce, setMustIncludeMirrorForce] = useState(true);
+  const [mustIncludeTeamTactics, setMustIncludeTeamTactics] = useState(true);
   const [moralePercent, setMoralePercent] = useState(0);
   const [loyaltyPercent, setLoyaltyPercent] = useState(34);
   const [recommendations, setRecommendations] = useState<
