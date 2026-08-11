@@ -480,9 +480,15 @@ button:disabled {
   color: #fff;
   background: rgba(26, 25, 22, 0.82);
   border-radius: 4px;
-  font-size: 1.3rem;
+  font-size: 0.7rem;
   font-weight: 600;
   line-height: 1.25;
+}
+.deck-card .card-level-badge {
+  padding: 0.15rem 0.4rem;
+  right: 0.3rem;
+  bottom: 0.3rem;
+  font-size: 1rem;
 }
 .card-damage-label {
   margin-top: 0.2rem;
