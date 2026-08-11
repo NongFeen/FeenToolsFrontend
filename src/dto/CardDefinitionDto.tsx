@@ -51,13 +51,13 @@ export const TITAN_SOUL_GROUPS = [
 ];
 
 export const CARD_AND_GEM_GROUPS = [
-  { subTitle: "General Base Metrics", keys: ["base_damage"] },
+  { subTitle: "Base Damage", keys: ["base_damage"] },
   {
-    subTitle: "Anatomical Parts Damage",
+    subTitle: "Part Damage",
     keys: ["head_damage", "torso_damage", "limbs_damage"],
   },
   {
-    subTitle: "Armor Scaling Layers",
+    subTitle: "Part Armor Type",
     keys: [
       "armor_damage",
       "head_armor_damage",
@@ -66,7 +66,7 @@ export const CARD_AND_GEM_GROUPS = [
     ],
   },
   {
-    subTitle: "Body Structure Layers",
+    subTitle: "Part Body Type",
     keys: [
       "body_damage",
       "head_body_damage",
@@ -75,7 +75,7 @@ export const CARD_AND_GEM_GROUPS = [
     ],
   },
   {
-    subTitle: "Titan Boss Type Modifiers",
+    subTitle: "Titan Boss Type Additives",
     keys: [
       "lojak_damage",
       "takedar_damage",
@@ -88,7 +88,7 @@ export const CARD_AND_GEM_GROUPS = [
     ],
   },
   {
-    subTitle: "Burst Card Support & Triggers",
+    subTitle: "Boss Burst Additives",
     keys: [
       "base_burst_damage",
       "burst_lojak_damage",
@@ -102,7 +102,7 @@ export const CARD_AND_GEM_GROUPS = [
     ],
   },
   {
-    subTitle: "Affliction Card Multipliers",
+    subTitle: "Boss Affliction Additives",
     keys: [
       "base_affliction_damage",
       "affliction_lojak_damage",
