@@ -80,10 +80,9 @@ export default function RecommendationDecks({
         {sortedDecks.map((deck, index) => {
           const pattern = deck.result?.best_pattern;
           const deckCards = deck.cards?.length ? deck.cards : deck.result?.deck ?? [];
-          const isBodyPhase = deck.result?.simulation_phase === "targeted_body";
           return (
             <article className="deck-card" key={`${deck.position}-${index}`}>
-              <div className="deck-heading"><div className="deck-number">Deck {index + 1}</div><span className={`simulation-phase${isBodyPhase ? " body" : ""}`}>{isBodyPhase ? "Targeted Body phase" : "Current boss"}</span></div>
+              <div className="deck-heading"><div className="deck-number">Deck {index + 1}</div></div>
               <div className="deck-images">
                 {deckCards.slice(0, 3).map((cardId) => {
                   const definition = definitions.get(normalizeCardKey(cardId));

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
-import type { CardDefinition, CurrentBoss, PlayerRaidData, PlayerSummary, SimulationJob, Tt2ClanStatus, Tt2PlayerStatus } from "../api/types";
+import type { CardDefinition, CurrentBoss, PlayerRaidData, PlayerSummary, SimulationBatch, SimulationJob, Tt2ClanStatus, Tt2PlayerStatus } from "../api/types";
 import BossEditor from "../components/BossEditor";
 import JobStatus from "../components/JobStatus";
 import Navbar from "../components/Navbar";
@@ -9,6 +9,13 @@ import { usePolling } from "../hooks/usePolling";
 import { isActiveJob, makeDefaultBoss } from "../utils/taptitan";
 
 const messageFor = (error: unknown, fallback: string) => error instanceof ApiError ? error.message : fallback;
+const BATCH_STORAGE_KEY = "taptitan.latestSimulationBatchId";
+const formatDuration = (milliseconds: number) => {
+  const seconds = milliseconds / 1_000;
+  if (seconds < 60) return `${seconds.toFixed(2)}s`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m ${(seconds - minutes * 60).toFixed(1)}s`;
+};
 
 export default function TapTitanAdmin() {
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
@@ -32,6 +39,8 @@ export default function TapTitanAdmin() {
   const [forceError, setForceError] = useState("");
   const [simulationPlayerIds, setSimulationPlayerIds] = useState<string[]>([]);
   const [includeBodyPhase, setIncludeBodyPhase] = useState(false);
+  const [simulationBatchId, setSimulationBatchId] = useState(() => window.localStorage.getItem(BATCH_STORAGE_KEY) ?? "");
+  const [simulationBatch, setSimulationBatch] = useState<SimulationBatch | null>(null);
 
   const refreshPlayers = useCallback(async () => {
     const list = await api.players();
@@ -96,6 +105,17 @@ export default function TapTitanAdmin() {
     load: () => api.internalJob(forceJobId),
     onData: (job) => { setForceJob(job); if (job.status === "completed") setNotice("Selected-player simulation completed. Recommendations are ready."); },
     onError: (reason) => setForceError(messageFor(reason, "Could not refresh simulation status.")),
+  });
+
+  usePolling({
+    enabled: Boolean(simulationBatchId) && (!simulationBatch || simulationBatch.status === "running"),
+    load: () => api.simulationBatch(simulationBatchId),
+    onData: (batch) => {
+      setSimulationBatch(batch);
+      if (batch.status === "completed") setNotice("Batch simulations and recommendations completed.");
+      if (batch.status === "completed_with_failures") setError(`Batch completed with ${batch.failed} failed simulation${batch.failed === 1 ? "" : "s"}.`);
+    },
+    onError: (reason) => setForceError(messageFor(reason, "Could not refresh batch simulation status.")),
   });
 
   const resetMessages = () => { setError(""); setNotice(""); };
@@ -251,18 +271,13 @@ export default function TapTitanAdmin() {
     if (selectedIds.length === 0) { setError("Select at least one player with saved stats."); return; }
     setBusy("force-all");
     try {
-      const results = await Promise.allSettled(selectedIds.map((playerId) => api.createSimulation(playerId, includeBodyPhase)));
-      const succeeded = results.filter((result) => result.status === "fulfilled");
-      const created = succeeded.filter((result) => result.status === "fulfilled" && result.value.created).length;
-      const existing = succeeded.length - created;
-      const failed = results.length - succeeded.length;
-      setNotice(`${created} simulation${created === 1 ? "" : "s"} queued${existing > 0 ? `; ${existing} existing job${existing === 1 ? "" : "s"} already tracked` : ""}.`);
-      if (failed > 0) {
-        const failureMessages = results.flatMap((result, index) => result.status === "rejected"
-          ? [`${players.find((player) => player.player_id === selectedIds[index])?.display_name ?? selectedIds[index]}: ${messageFor(result.reason, "Could not queue simulation.")}`]
-          : []);
-        setError(`${failed} selected player simulation${failed === 1 ? "" : "s"} could not be queued. ${failureMessages.join(" ")}`);
-      }
+      const accepted = await api.createSimulationBatch(selectedIds, includeBodyPhase);
+      setSimulationBatchId(accepted.batch_id);
+      setSimulationBatch(null);
+      window.localStorage.setItem(BATCH_STORAGE_KEY, accepted.batch_id);
+      setNotice(`${accepted.queued} simulation${accepted.queued === 1 ? "" : "s"} queued in one batch${accepted.existing > 0 ? `; ${accepted.existing} existing job${accepted.existing === 1 ? "" : "s"} tracked` : ""}.`);
+    } catch (reason) {
+      setError(messageFor(reason, "Could not create the simulation batch."));
     } finally { setBusy(""); }
   };
 
@@ -328,6 +343,21 @@ export default function TapTitanAdmin() {
                 })}
                 {players.length === 0 && <p className="panel-desc">No players are available.</p>}
               </div>
+              {simulationBatch && (
+                <div className={`simulation-batch-status status-${simulationBatch.status}`} role="status" aria-live="polite">
+                  <div className="batch-status-heading">
+                    <strong>Batch {simulationBatch.status.replaceAll("_", " ")}</strong>
+                    <span>{simulationBatch.completed + simulationBatch.failed} / {simulationBatch.tracked} players finished</span>
+                  </div>
+                  <dl className="batch-timing-grid">
+                    <div><dt>Simulation compute</dt><dd>{formatDuration(simulationBatch.simulation_time_ms)}</dd></div>
+                    <div><dt>Recommendation compute</dt><dd>{formatDuration(simulationBatch.recommendation_time_ms)}</dd></div>
+                    <div><dt>Combined compute</dt><dd>{formatDuration(simulationBatch.combined_processing_time_ms)}</dd></div>
+                    <div><dt>Batch wall time</dt><dd>{formatDuration(simulationBatch.wall_time_ms)}</dd></div>
+                  </dl>
+                  <small>{simulationBatch.pending} pending · {simulationBatch.running} simulating · {simulationBatch.optimizing} generating recommendations · {simulationBatch.failed} failed</small>
+                </div>
+              )}
             </div>
             {forceError && <div className="error-box">{forceError}</div>}
             <JobStatus job={forceJob} emptyMessage={forceJobId ? "Loading queued job…" : "No manually forced simulation in this session."} />

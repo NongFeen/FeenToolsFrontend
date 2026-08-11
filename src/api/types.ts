@@ -233,6 +233,32 @@ export interface JobAccepted {
   created: boolean;
 }
 
+export interface SimulationBatchAccepted {
+  batch_id: string;
+  requested: number;
+  queued: number;
+  existing: number;
+}
+
+export interface SimulationBatch {
+  batch_id: string;
+  status: "running" | "completed" | "completed_with_failures";
+  requested: number;
+  tracked: number;
+  queued: number;
+  pending: number;
+  running: number;
+  optimizing: number;
+  completed: number;
+  failed: number;
+  simulation_time_ms: number;
+  recommendation_time_ms: number;
+  combined_processing_time_ms: number;
+  wall_time_ms: number;
+  created_at: string;
+  completed_at: string | null;
+}
+
 export interface BossUpdateAccepted {
   status: string;
   message: string;

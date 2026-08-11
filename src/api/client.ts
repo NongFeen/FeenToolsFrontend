@@ -14,6 +14,8 @@ import type {
   PlayerSummary,
   Recommendation,
   RecommendationGenerationResponse,
+  SimulationBatch,
+  SimulationBatchAccepted,
   SimulationJob,
   Tt2PlayerStatus,
   Tt2ClanStatus,
@@ -167,6 +169,18 @@ export const api = {
       { method: "POST", body: json({ player_id, include_body_phase }) },
       true,
     ),
+  createSimulationBatch: (player_ids: string[], include_body_phase = false) =>
+    request<SimulationBatchAccepted>(
+      "/internal/simulation-jobs/batch",
+      { method: "POST", body: json({ player_ids, include_body_phase }) },
+      true,
+    ),
+  simulationBatch: (batchId: string) =>
+    request<SimulationBatch>(
+      `/internal/simulation-jobs/batch/${encodeURIComponent(batchId)}`,
+      {},
+      true,
+    ),
   internalJob: (jobId: string) =>
     request<SimulationJob>(
       `/internal/simulation-jobs/${encodeURIComponent(jobId)}`,
@@ -196,5 +210,6 @@ export const api = {
 
 export const assetUrl = (path: string) => {
   if (/^https?:\/\//i.test(path)) return path;
+  if (path.startsWith("/assets/")) return path;
   return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 };

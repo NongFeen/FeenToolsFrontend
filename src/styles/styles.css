@@ -308,11 +308,21 @@ button:disabled {
   margin-bottom: 1rem;
   padding: 0.85rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.7rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+.clan-damage-modifier-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.9rem;
+}
+.clan-damage-modifier-row > strong {
+  font-size: 0.8rem;
 }
 .clan-summary-mode {
   padding: 0.75rem;
@@ -765,18 +775,6 @@ button:disabled {
   gap: 0.75rem;
   margin-bottom: 0.7rem;
 }
-.simulation-phase {
-  padding: 0.18rem 0.42rem;
-  color: var(--text-muted);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 0.62rem;
-}
-.simulation-phase.body {
-  color: var(--accent);
-  border-color: var(--accent);
-}
 .deck-images {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1037,6 +1035,47 @@ button:disabled {
 .batch-simulation-actions {
   display: flex;
   gap: 0.6rem;
+}
+.simulation-batch-status {
+  margin-top: 0.85rem;
+  padding: 0.8rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.batch-status-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+.batch-status-heading span,
+.simulation-batch-status > small {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+.batch-timing-grid {
+  margin: 0.65rem 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.batch-timing-grid div {
+  padding: 0.55rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.batch-timing-grid dt {
+  color: var(--text-muted);
+  font-size: 0.64rem;
+}
+.batch-timing-grid dd {
+  margin-top: 0.2rem;
+  font-size: 0.86rem;
+  font-weight: 600;
 }
 .simulation-player-list {
   margin: 1rem 0;
@@ -1462,6 +1501,16 @@ input[aria-invalid="true"] {
 }
 
 @media (max-width: 640px) {
+  .batch-timing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .clan-recommendation-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .clan-damage-modifier-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
   .nav {
     height: auto;
     min-height: 60px;
