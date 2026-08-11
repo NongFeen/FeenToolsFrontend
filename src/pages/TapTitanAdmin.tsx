@@ -31,6 +31,7 @@ export default function TapTitanAdmin() {
   const [forceJob, setForceJob] = useState<SimulationJob | null>(null);
   const [forceError, setForceError] = useState("");
   const [simulationPlayerIds, setSimulationPlayerIds] = useState<string[]>([]);
+  const [includeBodyPhase, setIncludeBodyPhase] = useState(false);
 
   const refreshPlayers = useCallback(async () => {
     const list = await api.players();
@@ -222,7 +223,7 @@ export default function TapTitanAdmin() {
     resetMessages(); setForceError("");
     if (!selectedPlayerId) { setError("Select a player before forcing a simulation."); return; }
     setBusy("force");
-    try { const accepted = await api.createSimulation(selectedPlayerId); setForceJob(null); setForceJobId(accepted.job_id); setNotice(accepted.created ? "Simulation queued for the selected player." : "An existing selected-player simulation is being tracked."); }
+    try { const accepted = await api.createSimulation(selectedPlayerId, includeBodyPhase); setForceJob(null); setForceJobId(accepted.job_id); setNotice(accepted.created ? `Simulation queued for the selected player${includeBodyPhase ? " with the targeted Body phase enabled" : ""}.` : "An existing selected-player simulation is being tracked."); }
     catch (reason) { setError(messageFor(reason, "Could not start the selected-player simulation.")); }
     finally { setBusy(""); }
   };
@@ -250,7 +251,7 @@ export default function TapTitanAdmin() {
     if (selectedIds.length === 0) { setError("Select at least one player with saved stats."); return; }
     setBusy("force-all");
     try {
-      const results = await Promise.allSettled(selectedIds.map((playerId) => api.createSimulation(playerId)));
+      const results = await Promise.allSettled(selectedIds.map((playerId) => api.createSimulation(playerId, includeBodyPhase)));
       const succeeded = results.filter((result) => result.status === "fulfilled");
       const created = succeeded.filter((result) => result.status === "fulfilled" && result.value.created).length;
       const existing = succeeded.length - created;
@@ -306,6 +307,7 @@ export default function TapTitanAdmin() {
           <div className="section-gap"><BossEditor value={boss} onChange={setBoss} onSave={saveBoss} saving={busy === "boss"} /></div>
           <section id="section-simulation" className="panel scroll-target section-gap">
             <div className="panel-heading-row"><div><h2 className="panel-title">Selected-player Simulation</h2><p className="panel-desc">Force a simulation for only the selected player. Status refreshes every two seconds.</p></div><button className="calc-btn" type="button" disabled={!selectedPlayerId || busy === "force" || busy === "force-all"} onClick={forceSimulation}>{busy === "force" ? "Queueing…" : "Force selected player run"}</button></div>
+            <label className="check-row body-phase-option"><input type="checkbox" checked={includeBodyPhase} disabled={busy === "force" || busy === "force-all"} onChange={(event) => setIncludeBodyPhase(event.target.checked)} /><span>Also simulate targeted parts as Body</span></label>
             <div className="batch-simulation-section">
               <div className="batch-simulation-heading">
                 <div><h3>Run multiple players</h3><p className="panel-desc">Select players with saved stats, then queue one simulation for each.</p></div>

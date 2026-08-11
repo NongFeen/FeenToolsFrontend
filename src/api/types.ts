@@ -187,6 +187,7 @@ export interface SimDeckResult {
   deck_names?: string[];
   total_attack_patterns?: number;
   best_pattern: SimPatternResult | null;
+  simulation_phase?: "current" | "targeted_body";
   patterns?: SimPatternResult[];
 }
 
@@ -211,6 +212,7 @@ export interface Recommendation {
   must_include_mirror_force: boolean;
   must_include_team_tactics: boolean;
   total_average_damage: string;
+  body_phase_ran: boolean;
   decks: RecommendedDeck[];
   created_at: string;
 }

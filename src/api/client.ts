@@ -136,14 +136,15 @@ export const api = {
     deckCount: number,
     mustIncludeMirrorForce = false,
     mustIncludeTeamTactics = false,
+    includeBodyPhase?: boolean,
   ) =>
     request<Recommendation>(
-      `${playerPath(playerId)}/recommendations/current?deck_count=${deckCount}&must_include_mirror_force=${mustIncludeMirrorForce}&must_include_team_tactics=${mustIncludeTeamTactics}`,
+      `${playerPath(playerId)}/recommendations/current?deck_count=${deckCount}&must_include_mirror_force=${mustIncludeMirrorForce}&must_include_team_tactics=${mustIncludeTeamTactics}${includeBodyPhase === undefined ? "" : `&include_body_phase=${includeBodyPhase}`}`,
     ),
-  generateRecommendations: (playerId: string, deckCount: number) =>
+  generateRecommendations: (playerId: string, deckCount: number, include_body_phase = false) =>
     request<RecommendationGenerationResponse>(
       `${playerPath(playerId)}/recommendations`,
-      { method: "POST", body: json({ deck_count: deckCount }) },
+      { method: "POST", body: json({ deck_count: deckCount, include_body_phase }) },
     ),
   cards: () => request<CardDefinition[]>("/api/taptitan/cards"),
   convertPlayerData: (body: unknown) =>
@@ -160,10 +161,10 @@ export const api = {
       },
       true,
     ),
-  createSimulation: (player_id: string) =>
+  createSimulation: (player_id: string, include_body_phase = false) =>
     request<JobAccepted>(
       "/internal/simulation-jobs",
-      { method: "POST", body: json({ player_id }) },
+      { method: "POST", body: json({ player_id, include_body_phase }) },
       true,
     ),
   internalJob: (jobId: string) =>

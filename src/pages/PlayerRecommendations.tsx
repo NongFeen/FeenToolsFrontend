@@ -35,14 +35,15 @@ export default function PlayerRecommendations() {
   const [deckCount, setDeckCount] = useState(DEFAULT_DECK_COUNT);
   const [mustIncludeMirrorForce, setMustIncludeMirrorForce] = useState(true);
   const [mustIncludeTeamTactics, setMustIncludeTeamTactics] = useState(true);
+  const [recommendationMode, setRecommendationMode] = useState<"current" | "combined">("current");
   const [moralePercent, setMoralePercent] = useState(0);
   const [loyaltyPercent, setLoyaltyPercent] = useState(34);
   const [recommendations, setRecommendations] = useState<
-    Record<number, Recommendation | null>
-  >({ [DEFAULT_DECK_COUNT]: null });
+    Record<string, Recommendation | null>
+  >({});
   const [recommendationErrors, setRecommendationErrors] = useState<
-    Record<number, string>
-  >({ [DEFAULT_DECK_COUNT]: "" });
+    Record<string, string>
+  >({});
   const [recommendationsLoading, setRecommendationsLoading] = useState(true);
   const [generatingRecommendation, setGeneratingRecommendation] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -51,9 +52,11 @@ export default function PlayerRecommendations() {
   const completedJobRef = useRef("");
   const recommendationRequestRef = useRef(0);
   const recommendationsInitializedRef = useRef(false);
-  const generatedDeckCountsRef = useRef(new Set<number>());
+  const generatedDeckCountsRef = useRef(new Set<string>());
   const pendingScrollPositionRef = useRef<number | null>(null);
   const damageMultiplier = (1 + moralePercent / 100) * (1 + loyaltyPercent / 100);
+  const includeBodyPhase = recommendationMode === "combined";
+  const recommendationKey = `${deckCount}:${recommendationMode}`;
 
   const loadRecommendations = useCallback(async () => {
     const requestId = ++recommendationRequestRef.current;
@@ -68,42 +71,47 @@ export default function PlayerRecommendations() {
           deckCount,
           mustIncludeMirrorForce,
           mustIncludeTeamTactics,
+          includeBodyPhase,
         );
       } catch (error) {
         if (!(error instanceof ApiError) || error.status !== 404) {
           throw error;
         }
         if (recommendationRequestRef.current !== requestId) return;
-        if (!generatedDeckCountsRef.current.has(deckCount)) {
+        if (!generatedDeckCountsRef.current.has(recommendationKey)) {
           setGeneratingRecommendation(true);
-          await api.generateRecommendations(playerId, deckCount);
+          await api.generateRecommendations(playerId, deckCount, includeBodyPhase);
           if (recommendationRequestRef.current !== requestId) return;
-          generatedDeckCountsRef.current.add(deckCount);
+          generatedDeckCountsRef.current.add(recommendationKey);
         }
         recommendation = await api.recommendation(
           playerId,
           deckCount,
           mustIncludeMirrorForce,
           mustIncludeTeamTactics,
+          includeBodyPhase,
         );
       }
       if (recommendationRequestRef.current !== requestId) return;
-      generatedDeckCountsRef.current.add(deckCount);
+      if (includeBodyPhase && !recommendation.body_phase_ran) {
+        throw new ApiError("The selected simulation did not run the Targeted Body phase.", 409);
+      }
+      generatedDeckCountsRef.current.add(recommendationKey);
 
       pendingScrollPositionRef.current = window.scrollY;
       setRecommendations((current) => ({
         ...current,
-        [deckCount]: recommendation,
+        [recommendationKey]: recommendation,
       }));
-      setRecommendationErrors((current) => ({ ...current, [deckCount]: "" }));
+      setRecommendationErrors((current) => ({ ...current, [recommendationKey]: "" }));
     } catch (error) {
       if (recommendationRequestRef.current !== requestId) return;
 
       pendingScrollPositionRef.current = window.scrollY;
-      setRecommendations((current) => ({ ...current, [deckCount]: null }));
+      setRecommendations((current) => ({ ...current, [recommendationKey]: null }));
       setRecommendationErrors((current) => ({
         ...current,
-        [deckCount]:
+        [recommendationKey]:
           error instanceof ApiError && error.status === 404
             ? ""
             : errorMessage(
@@ -118,7 +126,7 @@ export default function PlayerRecommendations() {
         setGeneratingRecommendation(false);
       }
     }
-  }, [deckCount, mustIncludeMirrorForce, mustIncludeTeamTactics, playerId]);
+  }, [deckCount, includeBodyPhase, mustIncludeMirrorForce, mustIncludeTeamTactics, playerId, recommendationKey]);
 
   useLayoutEffect(() => {
     const scrollPosition = pendingScrollPositionRef.current;
@@ -253,6 +261,10 @@ export default function PlayerRecommendations() {
               <p className="panel-desc">Cards are unique across the optimized lineup.</p>
             </div>
             <div className="recommendation-controls">
+              <div className="recommendation-mode-control" role="group" aria-label="Simulation phase recommendation">
+                <button type="button" className={recommendationMode === "current" ? "selected" : ""} onClick={() => setRecommendationMode("current")}>Current boss only</button>
+                <button type="button" className={recommendationMode === "combined" ? "selected" : ""} onClick={() => setRecommendationMode("combined")}>Current + Body/Void phase</button>
+              </div>
               <div className="damage-modifier-controls">
                 <label className="damage-percent-control">
                   <span>Morale %</span>
@@ -309,17 +321,19 @@ export default function PlayerRecommendations() {
             </div>
           </div>
           <RecommendationDecks
-            recommendation={recommendations[deckCount] ?? null}
+            recommendation={recommendations[recommendationKey] ?? null}
             cards={cards}
             playerCards={player.stats?.card_list ?? []}
             loading={recommendationsLoading || generatingRecommendation}
-            error={recommendationErrors[deckCount] ?? ""}
+            error={recommendationErrors[recommendationKey] ?? ""}
             damageMultiplier={damageMultiplier}
             moralePercent={moralePercent}
             loyaltyPercent={loyaltyPercent}
             emptyMessage={
               generatingRecommendation
-                ? `Generating the best ${deckCount}-deck recommendations from the latest simulation...`
+                ? `Generating the best ${deckCount}-deck recommendations from the selected simulation mode...`
+                : recommendationMode === "combined"
+                  ? "No recommendation from a completed Targeted Body phase simulation is available."
                 : mustIncludeMirrorForce || mustIncludeTeamTactics
                   ? `No compatible ${deckCount}-deck recommendation containing the selected required cards is available.`
                   : `No compatible ${deckCount}-deck recommendation is available.`

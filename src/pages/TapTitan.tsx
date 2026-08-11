@@ -11,6 +11,48 @@ interface DeckPreview {
   error?: string;
 }
 
+interface PlayerRecommendationModes {
+  current: Recommendation | null;
+  combined: Recommendation | null;
+  currentError?: string;
+  combinedError?: string;
+}
+
+const loadRecommendationOrNull = async (playerId: string, includeBodyPhase: boolean) => {
+  try {
+    const recommendation = await api.recommendation(playerId, 6, true, true, includeBodyPhase);
+    return includeBodyPhase && !recommendation.body_phase_ran ? null : recommendation;
+  } catch (reason) {
+    if (reason instanceof ApiError && reason.status === 404) return null;
+    throw reason;
+  }
+};
+
+const summarizeRecommendations = (
+  players: PlayerSummary[],
+  recommendations: Record<string, PlayerRecommendationModes>,
+  mode: "current" | "combined",
+) => {
+  const available = players.flatMap((player) => {
+    const recommendation = recommendations[player.player_id]?.[mode];
+    return recommendation ? [recommendation] : [];
+  });
+  const totalDamage = available.reduce(
+    (total, recommendation) => total + BigInt(recommendation.total_average_damage.split(".")[0]),
+    0n,
+  );
+  const totalDecks = available.reduce((total, recommendation) => total + recommendation.decks.length, 0);
+  return {
+    totalDamage: totalDamage.toString(),
+    averagePerDeck: totalDecks === 0 ? "0" : (totalDamage / BigInt(totalDecks)).toString(),
+    playersCalculated: available.length,
+    totalDecks,
+    checksFailed: players.filter((player) => mode === "current"
+      ? Boolean(recommendations[player.player_id]?.currentError)
+      : Boolean(recommendations[player.player_id]?.combinedError)).length,
+  };
+};
+
 const readableCardName = (cardId: string) =>
   cardId.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
 const normalizeCardKey = (cardId: string) =>
@@ -31,6 +73,8 @@ export default function TapTitan() {
   const [error, setError] = useState("");
   const [hoveredPlayerId, setHoveredPlayerId] = useState("");
   const [deckPreviews, setDeckPreviews] = useState<Record<string, DeckPreview>>({});
+  const [clanRecommendations, setClanRecommendations] = useState<Record<string, PlayerRecommendationModes>>({});
+  const [clanRecommendationsLoading, setClanRecommendationsLoading] = useState(true);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const normalizedSearch = search.trim().toLocaleLowerCase();
@@ -45,12 +89,31 @@ export default function TapTitan() {
   useEffect(() => {
     let active = true;
     api.players()
-      .then((data) => { if (active) setPlayers(data); })
+      .then(async (data) => {
+        if (!active) return;
+        setPlayers(data);
+        const loaded = await Promise.all(data.map(async (player) => {
+          const [currentResult, combinedResult] = await Promise.allSettled([
+            loadRecommendationOrNull(player.player_id, false),
+            loadRecommendationOrNull(player.player_id, true),
+          ]);
+          return [player.player_id, {
+            current: currentResult.status === "fulfilled" ? currentResult.value : null,
+            combined: combinedResult.status === "fulfilled" ? combinedResult.value : null,
+            currentError: currentResult.status === "rejected" ? (currentResult.reason instanceof ApiError ? currentResult.reason.message : "Could not load current recommendation.") : undefined,
+            combinedError: combinedResult.status === "rejected" ? (combinedResult.reason instanceof ApiError ? combinedResult.reason.message : "Could not load Body/Void recommendation.") : undefined,
+          }] as const;
+        }));
+        if (active) setClanRecommendations(Object.fromEntries(loaded));
+      })
       .catch((reason) => { if (active) setError(reason instanceof ApiError ? reason.message : "Failed to load players."); })
-      .finally(() => { if (active) setLoading(false); });
+      .finally(() => { if (active) { setLoading(false); setClanRecommendationsLoading(false); } });
     api.cards().then((data) => { if (active) setCards(data); }).catch(() => undefined);
     return () => { active = false; };
   }, []);
+
+  const currentSummary = summarizeRecommendations(players, clanRecommendations, "current");
+  const combinedSummary = summarizeRecommendations(players, clanRecommendations, "combined");
 
   const cardDefinitions = new Map(
     cards.map((card) => [normalizeCardKey(card.id), card] as const),
@@ -70,18 +133,26 @@ export default function TapTitan() {
         ...current,
         [player.player_id]: { loading: true },
       }));
+      const loadedModes = clanRecommendations[player.player_id];
+      const recommendationPromise = loadedModes
+        ? Promise.resolve(loadedModes.combined ?? loadedModes.current)
+        : loadRecommendationOrNull(player.player_id, true)
+            .then((combined) => combined ?? loadRecommendationOrNull(player.player_id, false));
       Promise.all([
-        api.recommendation(player.player_id, 6, true, true),
+        recommendationPromise,
         api.player(player.player_id).catch(() => null),
       ])
         .then(([recommendation, detail]) => setDeckPreviews((current) => ({
           ...current,
-          [player.player_id]: {
+          [player.player_id]: recommendation ? {
             loading: false,
             recommendation,
             cardLevels: Object.fromEntries(
               (detail?.stats?.card_list ?? []).map((card) => [normalizeCardKey(card.card_id), card.level]),
             ),
+          } : {
+            loading: false,
+            error: "No six-deck recommendation is ready.",
           },
         })))
         .catch((reason) => setDeckPreviews((current) => ({
@@ -110,9 +181,26 @@ export default function TapTitan() {
       <main className="page-shell">
         <div className="page-header">
           <span className="eyebrow">Tap Titans 2</span>
-          <h1>Raid deck recommendations</h1>
+          <h1>Kero Clan deck recommendations</h1>
           <p>Select a player to view their current boss simulation and optimized six- or nine-deck lineup.</p>
         </div>
+        <section className="clan-recommendation-summary" aria-label="Clan recommendation totals">
+          {clanRecommendationsLoading && <p>Fetching recommendations for all listed players…</p>}
+          {!clanRecommendationsLoading && <>
+            <div className="clan-summary-mode">
+              <h2>Current boss only</h2>
+              <span>Combined average damage</span><strong>{formatDamage(currentSummary.totalDamage)}</strong>
+              <span>Average damage per deck</span><strong>{formatDamage(currentSummary.averagePerDeck)}</strong>
+              <small>{currentSummary.playersCalculated} / {players.length} players · {currentSummary.totalDecks} decks calculated{currentSummary.checksFailed > 0 ? ` · ${currentSummary.checksFailed} checks failed` : ""}</small>
+            </div>
+            <div className="clan-summary-mode body">
+              <h2>Current + Body/Void phase</h2>
+              <span>Combined average damage</span><strong>{formatDamage(combinedSummary.totalDamage)}</strong>
+              <span>Average damage per deck</span><strong>{formatDamage(combinedSummary.averagePerDeck)}</strong>
+              <small>{combinedSummary.playersCalculated} / {players.length} players · {combinedSummary.totalDecks} decks calculated{combinedSummary.checksFailed > 0 ? ` · ${combinedSummary.checksFailed} checks failed` : ""}</small>
+            </div>
+          </>}
+        </section>
         {loading && <div className="panel empty-state">Loading players…</div>}
         {!loading && error && <div className="error-box standalone-error">{error}</div>}
         {!loading && !error && players.length === 0 && (
@@ -140,12 +228,7 @@ export default function TapTitan() {
               onFocus={() => beginDeckPreview(player)}
               onBlur={endDeckPreview}
             >
-              <div><h2>{player.display_name}</h2><p>{player.player_id}</p></div>
-              <span
-                className={`status-dot ${player.stats_revision === null ? "off" : "on"}`}
-                title={player.stats_revision === null ? "Deck not ready" : "Deck ready"}
-                aria-label={player.stats_revision === null ? "Deck not ready" : "Deck ready"}
-              />
+                  <div><h2>{player.display_name}</h2><p>{player.player_id}</p></div>
               <span className="arrow" aria-hidden="true">→</span>
               {hoveredPlayerId === player.player_id && (
                 <div className="player-deck-preview" role="status">

@@ -304,6 +304,49 @@ button:disabled {
   font-size: 0.85rem;
 }
 
+.clan-recommendation-summary {
+  margin-bottom: 1rem;
+  padding: 0.85rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.7rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.clan-summary-mode {
+  padding: 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem 0.8rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.clan-summary-mode.body {
+  border-color: #d5c8bf;
+}
+.clan-summary-mode h2,
+.clan-summary-mode small {
+  grid-column: 1 / -1;
+}
+.clan-summary-mode h2 {
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+.clan-summary-mode small {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+.clan-recommendation-summary span,
+.clan-recommendation-summary p {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+.clan-recommendation-summary strong {
+  color: var(--text);
+  font-size: 1rem;
+}
 .player-search {
   display: block;
   margin-bottom: 0.75rem;
@@ -332,7 +375,7 @@ button:disabled {
   padding: 0.65rem 0.85rem;
   position: relative;
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: 0.75rem;
   background: var(--surface);
@@ -382,17 +425,6 @@ button:disabled {
   gap: 0.45rem;
   color: var(--text-muted);
   font-size: 0.78rem;
-}
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-.status-dot.on {
-  background: #32a66a;
-}
-.status-dot.off {
-  background: #b7b1a8;
 }
 .arrow {
   color: var(--accent);
@@ -605,6 +637,24 @@ button:disabled {
   align-items: flex-end;
   gap: 0.6rem;
 }
+.recommendation-mode-control {
+  display: flex;
+  gap: 0.35rem;
+}
+.recommendation-mode-control button {
+  min-height: 34px;
+  padding: 0.35rem 0.65rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 0.72rem;
+}
+.recommendation-mode-control button.selected {
+  color: var(--accent);
+  background: var(--accent-light);
+  border-color: var(--accent);
+}
 .damage-modifier-controls {
   display: flex;
   gap: 0.6rem;
@@ -697,12 +747,30 @@ button:disabled {
   border-radius: 9px;
 }
 .deck-number {
-  margin-bottom: 0.7rem;
   color: var(--accent);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+.deck-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.7rem;
+}
+.simulation-phase {
+  padding: 0.18rem 0.42rem;
+  color: var(--text-muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.62rem;
+}
+.simulation-phase.body {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 .deck-images {
   display: grid;
@@ -1031,6 +1099,9 @@ button:disabled {
 }
 .form-check {
   min-height: 40px;
+}
+.body-phase-option {
+  margin-top: 0.9rem;
 }
 .code-area {
   width: 100%;
