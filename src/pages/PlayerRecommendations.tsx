@@ -311,6 +311,7 @@ export default function PlayerRecommendations() {
           <RecommendationDecks
             recommendation={recommendations[deckCount] ?? null}
             cards={cards}
+            playerCards={player.stats?.card_list ?? []}
             loading={recommendationsLoading || generatingRecommendation}
             error={recommendationErrors[deckCount] ?? ""}
             damageMultiplier={damageMultiplier}

@@ -6,6 +6,7 @@ import Landing from "./pages/Landing";
 import TapTitan from "./pages/TapTitan";
 import PlayerRecommendations from "./pages/PlayerRecommendations";
 import TapTitanAdmin from "./pages/TapTitanAdmin";
+import TapTitanDebug from "./pages/TapTitanDebug";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -18,6 +19,7 @@ createRoot(document.getElementById("root")!).render(
           element={<PlayerRecommendations />}
         />
         <Route path="/tools/taptitan/admin" element={<TapTitanAdmin />} />
+        <Route path="/tools/taptitan/debug" element={<TapTitanDebug />} />
         <Route path="*" element={<Landing />} />
       </Routes>
     </BrowserRouter>

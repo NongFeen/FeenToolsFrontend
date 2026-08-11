@@ -1,5 +1,5 @@
 import { assetUrl } from "../api/client";
-import type { CardDefinition, Recommendation, RecommendedDeck } from "../api/types";
+import type { CardDefinition, PlayerCard, Recommendation, RecommendedDeck } from "../api/types";
 
 const normalizeCardKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 const formatDamage = (value: string | number | undefined, multiplier = 1) => {
@@ -29,6 +29,7 @@ const compareAverageDamage = (left: RecommendedDeck, right: RecommendedDeck) => 
 interface Props {
   recommendation: Recommendation | null;
   cards: CardDefinition[];
+  playerCards?: PlayerCard[];
   loading: boolean;
   error: string;
   emptyMessage?: string;
@@ -40,6 +41,7 @@ interface Props {
 export default function RecommendationDecks({
   recommendation,
   cards,
+  playerCards = [],
   loading,
   error,
   emptyMessage,
@@ -51,6 +53,7 @@ export default function RecommendationDecks({
   if (error) return <div className="error-box recommendation-error">{error}</div>;
   if (!recommendation || recommendation.decks.length === 0) return <div className="empty-state">{emptyMessage ?? "No completed recommendation is available for this deck count."}</div>;
   const definitions = new Map(cards.map((card) => [normalizeCardKey(card.id), card] as const));
+  const levels = new Map(playerCards.map((card) => [normalizeCardKey(card.card_id), card.level] as const));
   const sortedDecks = [...recommendation.decks].sort(compareAverageDamage);
   return (
     <>
@@ -75,7 +78,11 @@ export default function RecommendationDecks({
                   const definition = definitions.get(normalizeCardKey(cardId));
                   const readableId = cardId.replace(/([A-Z])/g, " $1").trim();
                   const alt = `${definition?.name ?? readableId} raid card`;
-                  return definition?.image ? <img key={cardId} src={assetUrl(definition.image)} alt={alt} loading="lazy" /> : <span key={cardId} className="deck-image-missing" role="img" aria-label={`${alt} image unavailable`}>Image unavailable</span>;
+                  const level = levels.get(normalizeCardKey(cardId));
+                  return <span className="deck-image-wrap" key={cardId}>
+                    {definition?.image ? <img src={assetUrl(definition.image)} alt={alt} loading="lazy" /> : <span className="deck-image-missing" role="img" aria-label={`${alt} image unavailable`}>Image unavailable</span>}
+                    {level !== undefined && <small className="card-level-badge">Lv {level}</small>}
+                  </span>;
                 })}
               </div>
               <dl className="deck-metrics">

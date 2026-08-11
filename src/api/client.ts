@@ -5,6 +5,7 @@ import type {
   CardDefinition,
   ConvertedPlayerDataResponse,
   CurrentBoss,
+  DebugSimulationResponse,
   HealthResponse,
   JobAccepted,
   PlayerDetail,
@@ -175,6 +176,19 @@ export const api = {
     request<JobAccepted>(
       `/internal/simulation-jobs/${encodeURIComponent(jobId)}/retry`,
       { method: "POST" },
+      true,
+    ),
+  runDebugSimulation: (body: {
+    player_id: string;
+    boss_data: BossData;
+    attackable_parts: BossPartName[];
+    deck: string[];
+    total_taps: number;
+    rounds_per_pattern: number;
+  }) =>
+    request<DebugSimulationResponse>(
+      "/internal/simulation-debug",
+      { method: "POST", body: json(body) },
       true,
     ),
 };

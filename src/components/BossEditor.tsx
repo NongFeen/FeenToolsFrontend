@@ -62,11 +62,13 @@ const isStateControlledCurrentField = (
 interface Props {
   value: CurrentBoss;
   onChange: (value: CurrentBoss) => void;
-  onSave: () => void;
-  saving: boolean;
+  onSave?: () => void;
+  saving?: boolean;
+  mode?: "current" | "debug";
 }
 
-export default function BossEditor({ value, onChange, onSave, saving }: Props) {
+export default function BossEditor({ value, onChange, onSave, saving = false, mode = "current" }: Props) {
+  const debugMode = mode === "debug";
   const cursedPartCount = PARTS.filter(({ key }) => value.boss_data[key].part_state === "Cursed").length;
   const curseReductionPercent = cursedPartCount * 6;
   const updatePart = (key: BossPartKey, changes: Partial<BossPart>) => {
@@ -111,10 +113,10 @@ export default function BossEditor({ value, onChange, onSave, saving }: Props) {
   };
 
   return (
-    <section id="section-boss" className="panel scroll-target">
+    <section id={debugMode ? "debug-boss" : "section-boss"} className="panel scroll-target">
       <div className="panel-heading-row">
-        <div><h2 className="panel-title">Current Boss</h2><p className="panel-desc">Edit the singleton boss. Saving clears old jobs and does not start simulations.</p></div>
-        <button className="calc-btn" type="button" disabled={saving || value.attackable_parts.length === 0} onClick={onSave}>{saving ? "Saving…" : "Save boss"}</button>
+        <div><h2 className="panel-title">{debugMode ? "Debug Boss Setup" : "Current Boss"}</h2><p className="panel-desc">{debugMode ? "Used only for this single-deck run. It does not change the saved current boss." : "Edit the singleton boss. Saving clears old jobs and does not start simulations."}</p></div>
+        {!debugMode && onSave && <button className="calc-btn" type="button" disabled={saving || value.attackable_parts.length === 0} onClick={onSave}>{saving ? "Saving…" : "Save boss"}</button>}
       </div>
       <div className="boss-options-grid">
         <label className="field">
@@ -140,7 +142,7 @@ export default function BossEditor({ value, onChange, onSave, saving }: Props) {
           </select>
           <small>{cursedPartCount} cursed {cursedPartCount === 1 ? "part" : "parts"} = {curseReductionPercent}% damage reduction.</small>
         </label>
-        <label className="field checkbox-field">
+        {!debugMode && <label className="field checkbox-field">
           <span>Recommendation attack size</span>
           <span>
             <input
@@ -157,7 +159,7 @@ export default function BossEditor({ value, onChange, onSave, saving }: Props) {
             Recommend only 1–2-part attack patterns
           </span>
           <small>Wide attack patterns are skipped during simulation when enabled.</small>
-        </label>
+        </label>}
       </div>
       <fieldset className="boss-group-helper">
         <legend>Max armor/body group helpers</legend>

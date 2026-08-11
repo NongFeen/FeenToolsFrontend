@@ -7,6 +7,7 @@ import Navbar from "../components/Navbar";
 interface DeckPreview {
   loading: boolean;
   recommendation?: Recommendation;
+  cardLevels?: Record<string, number>;
   error?: string;
 }
 
@@ -69,10 +70,19 @@ export default function TapTitan() {
         ...current,
         [player.player_id]: { loading: true },
       }));
-      api.recommendation(player.player_id, 6, true, true)
-        .then((recommendation) => setDeckPreviews((current) => ({
+      Promise.all([
+        api.recommendation(player.player_id, 6, true, true),
+        api.player(player.player_id).catch(() => null),
+      ])
+        .then(([recommendation, detail]) => setDeckPreviews((current) => ({
           ...current,
-          [player.player_id]: { loading: false, recommendation },
+          [player.player_id]: {
+            loading: false,
+            recommendation,
+            cardLevels: Object.fromEntries(
+              (detail?.stats?.card_list ?? []).map((card) => [normalizeCardKey(card.card_id), card.level]),
+            ),
+          },
         })))
         .catch((reason) => setDeckPreviews((current) => ({
           ...current,
@@ -161,16 +171,15 @@ export default function TapTitan() {
                                 {cards.slice(0, 3).map((cardId) => {
                                   const definition = cardDefinitions.get(normalizeCardKey(cardId));
                                   const cardName = definition?.name ?? readableCardName(cardId);
-                                  return definition?.image ? (
-                                    <img
-                                      key={cardId}
-                                      src={assetUrl(definition.image)}
-                                      alt={cardName}
-                                      title={cardName}
-                                    />
-                                  ) : (
-                                    <span key={cardId} role="img" aria-label={`${cardName} image unavailable`}>?</span>
-                                  );
+                                  const level = deckPreviews[player.player_id]?.cardLevels?.[normalizeCardKey(cardId)];
+                                  return <span className="preview-card-image" key={cardId}>
+                                    {definition?.image ? (
+                                      <img src={assetUrl(definition.image)} alt={cardName} title={cardName} />
+                                    ) : (
+                                      <span role="img" aria-label={`${cardName} image unavailable`}>?</span>
+                                    )}
+                                    {level !== undefined && <small className="card-level-badge">Lv {level}</small>}
+                                  </span>;
                                 })}
                               </span>
                             </li>

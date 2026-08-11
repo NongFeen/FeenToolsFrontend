@@ -172,6 +172,14 @@ export interface SimPatternResult {
   lowest_round_damage_display: string;
   highest_round_damage: number;
   highest_round_damage_display: string;
+  card_damage?: SimCardDamageResult[];
+}
+
+export interface SimCardDamageResult {
+  card: string;
+  card_name: string;
+  average_damage: number;
+  average_damage_display: string;
 }
 
 export interface SimDeckResult {
@@ -179,6 +187,14 @@ export interface SimDeckResult {
   deck_names?: string[];
   total_attack_patterns?: number;
   best_pattern: SimPatternResult | null;
+  patterns?: SimPatternResult[];
+}
+
+export interface DebugSimulationResponse {
+  rounds_per_pattern: number;
+  ticks_per_round: number;
+  total_taps: number;
+  result: SimDeckResult;
 }
 
 export interface RecommendedDeck {
