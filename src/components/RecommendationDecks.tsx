@@ -12,6 +12,16 @@ const formatDamage = (value: string | number | undefined, multiplier = 1) => {
   } catch { return String(value); }
 };
 
+const formatCompactDamage = (value: string | number | undefined, multiplier = 1) => {
+  if (value === undefined) return "—";
+  const damage = Number(value) * multiplier;
+  if (!Number.isFinite(damage)) return String(value);
+  return new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(damage);
+};
+
 const averageDamageValue = (deck: RecommendedDeck) => {
   const wholeNumber = String(
     deck.average_damage ?? deck.result?.best_pattern?.average_damage ?? 0,
@@ -79,9 +89,15 @@ export default function RecommendationDecks({
                   const readableId = cardId.replace(/([A-Z])/g, " $1").trim();
                   const alt = `${definition?.name ?? readableId} raid card`;
                   const level = levels.get(normalizeCardKey(cardId));
+                  const cardDamage = pattern?.card_damage?.find(
+                    (entry) => normalizeCardKey(entry.card) === normalizeCardKey(cardId),
+                  );
                   return <span className="deck-image-wrap" key={cardId}>
-                    {definition?.image ? <img src={assetUrl(definition.image)} alt={alt} loading="lazy" /> : <span className="deck-image-missing" role="img" aria-label={`${alt} image unavailable`}>Image unavailable</span>}
-                    {level !== undefined && <small className="card-level-badge">Lv {level}</small>}
+                    <span className="card-art-wrap">
+                      {definition?.image ? <img src={assetUrl(definition.image)} alt={alt} loading="lazy" /> : <span className="deck-image-missing" role="img" aria-label={`${alt} image unavailable`}>Image unavailable</span>}
+                      {level !== undefined && <small className="card-level-badge">Lv {level}</small>}
+                    </span>
+                    <small className="card-damage-label">{formatCompactDamage(cardDamage?.average_damage, damageMultiplier)}</small>
                   </span>;
                 })}
               </div>

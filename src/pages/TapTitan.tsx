@@ -172,13 +172,19 @@ export default function TapTitan() {
                                   const definition = cardDefinitions.get(normalizeCardKey(cardId));
                                   const cardName = definition?.name ?? readableCardName(cardId);
                                   const level = deckPreviews[player.player_id]?.cardLevels?.[normalizeCardKey(cardId)];
-                                  return <span className="preview-card-image" key={cardId}>
-                                    {definition?.image ? (
-                                      <img src={assetUrl(definition.image)} alt={cardName} title={cardName} />
-                                    ) : (
-                                      <span role="img" aria-label={`${cardName} image unavailable`}>?</span>
-                                    )}
-                                    {level !== undefined && <small className="card-level-badge">Lv {level}</small>}
+                                  const cardDamage = deck.result?.best_pattern?.card_damage?.find(
+                                    (entry) => normalizeCardKey(entry.card) === normalizeCardKey(cardId),
+                                  );
+                                  return <span className="preview-card-slot" key={cardId}>
+                                    <span className="preview-card-image">
+                                      {definition?.image ? (
+                                        <img src={assetUrl(definition.image)} alt={cardName} title={cardName} />
+                                      ) : (
+                                        <span role="img" aria-label={`${cardName} image unavailable`}>?</span>
+                                      )}
+                                      {level !== undefined && <small className="card-level-badge">Lv {level}</small>}
+                                    </span>
+                                    <small className="card-damage-label">{cardDamage?.average_damage_display ?? "—"}</small>
                                   </span>;
                                 })}
                               </span>
