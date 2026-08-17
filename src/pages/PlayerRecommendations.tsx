@@ -12,6 +12,7 @@ import JobStatus from "../components/JobStatus";
 import Navbar from "../components/Navbar";
 import RecommendationDecks from "../components/RecommendationDecks";
 import { usePolling } from "../hooks/usePolling";
+import { useRaidMoraleDefault } from "../hooks/useRaidMoraleDefault";
 import { isActiveJob } from "../utils/taptitan";
 
 const DEFAULT_DECK_COUNT = 6;
@@ -37,6 +38,7 @@ export default function PlayerRecommendations() {
   const [mustIncludeTeamTactics, setMustIncludeTeamTactics] = useState(true);
   const [recommendationMode, setRecommendationMode] = useState<"current" | "combined">("current");
   const [moralePercent, setMoralePercent] = useState(0);
+  const setEditableMoralePercent = useRaidMoraleDefault(setMoralePercent);
   const [loyaltyPercent, setLoyaltyPercent] = useState(34);
   const [recommendations, setRecommendations] = useState<
     Record<string, Recommendation | null>
@@ -274,7 +276,7 @@ export default function PlayerRecommendations() {
                     max={100}
                     step={1}
                     value={moralePercent}
-                    onChange={(event) => setMoralePercent(clampPercent(event.currentTarget.valueAsNumber, 100))}
+                    onChange={(event) => setEditableMoralePercent(clampPercent(event.currentTarget.valueAsNumber, 100))}
                   />
                 </label>
                 <label className="damage-percent-control">

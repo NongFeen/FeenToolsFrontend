@@ -10,7 +10,7 @@ import type {
 } from "../api/types";
 import ShorthandNumberInput from "./ShorthandNumberInput";
 
-type BossPartKey = Exclude<keyof BossData, "boss_name" | "global_raid_modifier" | "curse_type" | "recommend_1_to_2_part_patterns_only" | "damage_results">;
+type BossPartKey = Exclude<keyof BossData, "boss_name" | "global_raid_modifier" | "global_raid_modifier_amount" | "curse_type" | "curse_damage_per_curse" | "recommend_1_to_2_part_patterns_only" | "damage_results">;
 
 const PARTS: Array<{ key: BossPartKey; name: BossPartName; label: string }> = [
   { key: "head", name: "Head", label: "Head" },
@@ -70,7 +70,7 @@ interface Props {
 export default function BossEditor({ value, onChange, onSave, saving = false, mode = "current" }: Props) {
   const debugMode = mode === "debug";
   const cursedPartCount = PARTS.filter(({ key }) => value.boss_data[key].part_state === "Cursed").length;
-  const curseReductionPercent = cursedPartCount * 6;
+  const curseReductionPercent = cursedPartCount * (value.boss_data.curse_damage_per_curse ?? 0.06) * 100;
   const updatePart = (key: BossPartKey, changes: Partial<BossPart>) => {
     const current = value.boss_data[key];
     if (!current || typeof current !== "object" || !("part_name" in current)) return;
@@ -141,6 +141,41 @@ export default function BossEditor({ value, onChange, onSave, saving = false, mo
             <option value="AfflictionDamage">Affliction damage</option>
           </select>
           <small>{cursedPartCount} cursed {cursedPartCount === 1 ? "part" : "parts"} = {curseReductionPercent}% damage reduction.</small>
+        </label>
+        <label className="field">
+          <span>Global modifier amount</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="Use standard amount"
+            value={value.boss_data.global_raid_modifier_amount ?? ""}
+            onChange={(event) => onChange({
+              ...value,
+              boss_data: {
+                ...value.boss_data,
+                global_raid_modifier_amount: event.currentTarget.value === "" ? null : Math.max(0, event.currentTarget.valueAsNumber),
+              },
+            })}
+          />
+          <small>Fractional value: 0.5 means +50%. Blank uses the standard game amount.</small>
+        </label>
+        <label className="field">
+          <span>Curse reduction per cursed part</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={value.boss_data.curse_damage_per_curse ?? 0.06}
+            onChange={(event) => onChange({
+              ...value,
+              boss_data: {
+                ...value.boss_data,
+                curse_damage_per_curse: Math.max(0, event.currentTarget.valueAsNumber),
+              },
+            })}
+          />
+          <small>Fractional value: 0.06 means 6% per cursed part.</small>
         </label>
         {!debugMode && <label className="field checkbox-field">
           <span>Recommendation attack size</span>

@@ -7,6 +7,7 @@ import type {
   Recommendation,
 } from "../api/types";
 import Navbar from "../components/Navbar";
+import { useRaidMoraleDefault } from "../hooks/useRaidMoraleDefault";
 
 interface DeckPreview {
   loading: boolean;
@@ -115,6 +116,7 @@ export default function TapTitan() {
   const [cards, setCards] = useState<CardDefinition[]>([]);
   const [search, setSearch] = useState("");
   const [moralePercent, setMoralePercent] = useState(0);
+  const setEditableMoralePercent = useRaidMoraleDefault(setMoralePercent);
   const [loyaltyPercent, setLoyaltyPercent] = useState(34);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -372,7 +374,7 @@ export default function TapTitan() {
                   step={1}
                   value={moralePercent}
                   onChange={(event) =>
-                    setMoralePercent(
+                    setEditableMoralePercent(
                       clampPercent(event.currentTarget.valueAsNumber, 100),
                     )
                   }

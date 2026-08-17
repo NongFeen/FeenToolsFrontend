@@ -14,6 +14,7 @@ import type {
   PlayerSummary,
   Recommendation,
   RecommendationGenerationResponse,
+  RaidCycle,
   SimulationBatch,
   SimulationBatchAccepted,
   SimulationJob,
@@ -133,6 +134,7 @@ export const api = {
   playerJobs: (playerId: string) =>
     request<SimulationJob[]>(`${playerPath(playerId)}/simulation-jobs`),
   currentBoss: () => request<CurrentBoss>("/api/current-boss"),
+  currentRaidCycle: () => request<RaidCycle>("/api/raid-cycle/current"),
   recommendation: (
     playerId: string,
     deckCount: number,

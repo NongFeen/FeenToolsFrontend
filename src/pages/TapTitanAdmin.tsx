@@ -61,6 +61,8 @@ export default function TapTitanAdmin() {
         boss_data: {
           ...bossResult.value.boss_data,
           global_raid_modifier: bossResult.value.boss_data.global_raid_modifier ?? "None",
+          global_raid_modifier_amount: bossResult.value.boss_data.global_raid_modifier_amount ?? null,
+          curse_damage_per_curse: bossResult.value.boss_data.curse_damage_per_curse ?? 0.06,
         },
       });
       else if (!(bossResult.reason instanceof ApiError && bossResult.reason.status === 404)) setError(messageFor(bossResult.reason, "Could not load current boss."));

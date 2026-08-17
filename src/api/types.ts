@@ -145,7 +145,9 @@ export interface BossPart {
 export interface BossData {
   boss_name: BossName;
   global_raid_modifier: GlobalRaidModifier;
+  global_raid_modifier_amount?: number | null;
   curse_type: CurseType;
+  curse_damage_per_curse?: number;
   recommend_1_to_2_part_patterns_only: boolean;
   head: BossPart;
   torso: BossPart;
@@ -227,6 +229,19 @@ export interface HealthResponse {
   status: string;
   version: string;
   database: boolean;
+}
+
+export interface RaidCycle {
+  clan_code: string;
+  raid_id: number;
+  started_at: string | null;
+  raid_started_at: string;
+  next_reset_at: string;
+  morale_percent: number;
+  team_tactics_morale_percent: number;
+  default_morale_percent: number;
+  mirror_force_boost: number;
+  updated_at: string;
 }
 
 export interface JobAccepted {
