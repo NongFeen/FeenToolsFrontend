@@ -70,7 +70,7 @@ interface Props {
 export default function BossEditor({ value, onChange, onSave, saving = false, mode = "current" }: Props) {
   const debugMode = mode === "debug";
   const cursedPartCount = PARTS.filter(({ key }) => value.boss_data[key].part_state === "Cursed").length;
-  const curseReductionPercent = cursedPartCount * (value.boss_data.curse_damage_per_curse ?? 0.06) * 100;
+  const curseReductionPercent = cursedPartCount * 6;
   const updatePart = (key: BossPartKey, changes: Partial<BossPart>) => {
     const current = value.boss_data[key];
     if (!current || typeof current !== "object" || !("part_name" in current)) return;
@@ -115,8 +115,8 @@ export default function BossEditor({ value, onChange, onSave, saving = false, mo
   return (
     <section id={debugMode ? "debug-boss" : "section-boss"} className="panel scroll-target">
       <div className="panel-heading-row">
-        <div><h2 className="panel-title">{debugMode ? "Debug Boss Setup" : "Current Boss"}</h2><p className="panel-desc">{debugMode ? "Used only for this single-deck run. It does not change the saved current boss." : "Edit the singleton boss. Saving clears old jobs and does not start simulations."}</p></div>
-        {!debugMode && onSave && <button className="calc-btn" type="button" disabled={saving || value.attackable_parts.length === 0} onClick={onSave}>{saving ? "Saving…" : "Save boss"}</button>}
+        <div><h2 className="panel-title">{debugMode ? "Debug Boss Setup" : "Sims Boss Data"}</h2><p className="panel-desc">{debugMode ? "Used only for this single-deck run. It does not change the saved sims boss." : "Editable boss input used by simulations. Saving clears old simulation results and does not start a new run."}</p></div>
+        {!debugMode && onSave && <button className="calc-btn" type="button" disabled={saving || value.attackable_parts.length === 0} onClick={onSave}>{saving ? "Saving…" : "Save sims boss"}</button>}
       </div>
       <div className="boss-options-grid">
         <label className="field">
@@ -127,55 +127,20 @@ export default function BossEditor({ value, onChange, onSave, saving = false, mo
         </label>
         <label className="field">
           <span>Global raid modifier</span>
-          <select value={value.boss_data.global_raid_modifier ?? "None"} onChange={(event) => onChange({ ...value, boss_data: { ...value.boss_data, global_raid_modifier: event.target.value as GlobalRaidModifier } })}>
+          <select value={value.boss_data.global_raid_modifier ?? "None"} onChange={(event) => onChange({ ...value, boss_data: { ...value.boss_data, global_raid_modifier: event.target.value as GlobalRaidModifier, global_raid_modifier_amount: null } })}>
             {GLOBAL_RAID_MODIFIERS.map((modifier) => <option key={modifier.value} value={modifier.value}>{modifier.label}</option>)}
           </select>
           <small>Only one modifier can be active for the current boss.</small>
         </label>
         <label className="field">
           <span>Curse type</span>
-          <select value={value.boss_data.curse_type ?? "None"} onChange={(event) => onChange({ ...value, boss_data: { ...value.boss_data, curse_type: event.target.value as CurseType } })}>
+          <select value={value.boss_data.curse_type ?? "None"} onChange={(event) => onChange({ ...value, boss_data: { ...value.boss_data, curse_type: event.target.value as CurseType, curse_damage_per_curse: 0.06 } })}>
             <option value="None">None</option>
             <option value="BodyDamage">Body damage</option>
             <option value="BurstDamage">Burst damage</option>
             <option value="AfflictionDamage">Affliction damage</option>
           </select>
           <small>{cursedPartCount} cursed {cursedPartCount === 1 ? "part" : "parts"} = {curseReductionPercent}% damage reduction.</small>
-        </label>
-        <label className="field">
-          <span>Global modifier amount</span>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="Use standard amount"
-            value={value.boss_data.global_raid_modifier_amount ?? ""}
-            onChange={(event) => onChange({
-              ...value,
-              boss_data: {
-                ...value.boss_data,
-                global_raid_modifier_amount: event.currentTarget.value === "" ? null : Math.max(0, event.currentTarget.valueAsNumber),
-              },
-            })}
-          />
-          <small>Fractional value: 0.5 means +50%. Blank uses the standard game amount.</small>
-        </label>
-        <label className="field">
-          <span>Curse reduction per cursed part</span>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={value.boss_data.curse_damage_per_curse ?? 0.06}
-            onChange={(event) => onChange({
-              ...value,
-              boss_data: {
-                ...value.boss_data,
-                curse_damage_per_curse: Math.max(0, event.currentTarget.valueAsNumber),
-              },
-            })}
-          />
-          <small>Fractional value: 0.06 means 6% per cursed part.</small>
         </label>
         {!debugMode && <label className="field checkbox-field">
           <span>Recommendation attack size</span>

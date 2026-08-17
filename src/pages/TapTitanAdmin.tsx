@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
-import type { CardDefinition, CurrentBoss, PlayerRaidData, PlayerSummary, SimulationBatch, SimulationJob, Tt2ClanStatus, Tt2PlayerStatus } from "../api/types";
+import type { CardDefinition, CurrentBoss, LiveCurrentBoss, PlayerRaidData, PlayerSummary, SimulationBatch, SimulationJob, Tt2ClanStatus, Tt2PlayerStatus } from "../api/types";
 import BossEditor from "../components/BossEditor";
 import JobStatus from "../components/JobStatus";
+import LiveCurrentBossPanel from "../components/LiveCurrentBossPanel";
 import Navbar from "../components/Navbar";
 import StatsEditor from "../components/StatsEditor";
 import { usePolling } from "../hooks/usePolling";
@@ -23,6 +24,8 @@ export default function TapTitanAdmin() {
   const [cards, setCards] = useState<CardDefinition[]>([]);
   const [stats, setStats] = useState<PlayerRaidData | null>(null);
   const [boss, setBoss] = useState<CurrentBoss>(makeDefaultBoss);
+  const [liveBoss, setLiveBoss] = useState<LiveCurrentBoss | null>(null);
+  const [liveBossRefreshing, setLiveBossRefreshing] = useState(false);
   const [createForm, setCreateForm] = useState({ player_id: "", display_name: "", player_token: "", auto_sims: false });
   const [playerToken, setPlayerToken] = useState("");
   const [tt2Status, setTt2Status] = useState<Tt2PlayerStatus>({ configured: false, connected: false, raid_connected: false });
@@ -50,7 +53,7 @@ export default function TapTitanAdmin() {
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([api.players(), api.cards(), api.currentBoss(), api.tt2PlayerStatus(), api.tt2ClanStatus()]).then(([playersResult, cardsResult, bossResult, tt2Result, clanStatusResult]) => {
+    Promise.allSettled([api.players(), api.cards(), api.simsBoss(), api.tt2PlayerStatus(), api.tt2ClanStatus(), api.liveCurrentBoss()]).then(([playersResult, cardsResult, bossResult, tt2Result, clanStatusResult, liveBossResult]) => {
       if (!active) return;
       if (playersResult.status === "fulfilled") setPlayers(playersResult.value);
       else setError(messageFor(playersResult.reason, "Could not load players."));
@@ -65,9 +68,10 @@ export default function TapTitanAdmin() {
           curse_damage_per_curse: bossResult.value.boss_data.curse_damage_per_curse ?? 0.06,
         },
       });
-      else if (!(bossResult.reason instanceof ApiError && bossResult.reason.status === 404)) setError(messageFor(bossResult.reason, "Could not load current boss."));
+      else if (!(bossResult.reason instanceof ApiError && bossResult.reason.status === 404)) setError(messageFor(bossResult.reason, "Could not load sims boss data."));
       if (tt2Result.status === "fulfilled") setTt2Status(tt2Result.value);
       if (clanStatusResult.status === "fulfilled") setTt2ClanStatus(clanStatusResult.value);
+      if (liveBossResult.status === "fulfilled") setLiveBoss(liveBossResult.value);
       setLoading(false);
     });
     return () => { active = false; };
@@ -114,13 +118,41 @@ export default function TapTitanAdmin() {
     load: () => api.simulationBatch(simulationBatchId),
     onData: (batch) => {
       setSimulationBatch(batch);
+      if (batch.status !== "running") {
+        setSimulationBatchId("");
+        window.localStorage.removeItem(BATCH_STORAGE_KEY);
+      }
       if (batch.status === "completed") setNotice("Batch simulations and recommendations completed.");
       if (batch.status === "completed_with_failures") setError(`Batch completed with ${batch.failed} failed simulation${batch.failed === 1 ? "" : "s"}.`);
     },
-    onError: (reason) => setForceError(messageFor(reason, "Could not refresh batch simulation status.")),
+    onError: (reason) => {
+      if (reason instanceof ApiError && reason.status === 404) {
+        setSimulationBatchId("");
+        setSimulationBatch(null);
+        window.localStorage.removeItem(BATCH_STORAGE_KEY);
+        return;
+      }
+      setForceError(messageFor(reason, "Could not refresh batch simulation status."));
+    },
   });
 
   const resetMessages = () => { setError(""); setNotice(""); };
+  const refreshLiveBoss = async () => {
+    resetMessages();
+    setLiveBossRefreshing(true);
+    try {
+      setLiveBoss(await api.liveCurrentBoss());
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 404) {
+        setLiveBoss(null);
+        setNotice("No attack event has been received since the backend started.");
+      } else {
+        setError(messageFor(reason, "Could not load current boss data."));
+      }
+    } finally {
+      setLiveBossRefreshing(false);
+    }
+  };
   const selectPlayer = (playerId: string) => {
     setSelectedPlayerId(playerId);
     setStats(null);
@@ -236,8 +268,12 @@ export default function TapTitanAdmin() {
 
   const saveBoss = async () => {
     resetMessages(); setBusy("boss");
-    try { const response = await api.updateBoss(boss.boss_data, boss.attackable_parts); setForceJobId(""); setForceJob(null); setNotice(response.message); }
-    catch (reason) { setError(messageFor(reason, "Could not save current boss.")); }
+    try {
+      const response = await api.updateSimsBoss({ ...boss.boss_data, global_raid_modifier_amount: null, curse_damage_per_curse: 0.06 }, boss.attackable_parts);
+      setBoss((current) => ({ ...current, boss_data: { ...current.boss_data, global_raid_modifier_amount: null, curse_damage_per_curse: 0.06 } }));
+      setForceJobId(""); setForceJob(null); setNotice(response.message);
+    }
+    catch (reason) { setError(messageFor(reason, "Could not save sims boss data.")); }
     finally { setBusy(""); }
   };
 
@@ -294,10 +330,10 @@ export default function TapTitanAdmin() {
       <div className="layout admin-layout">
         <aside className="sidebar admin-sidebar" aria-label="Admin sections">
           <p className="sidebar-label">Admin</p>
-          {[ ["section-players", "Players"], ["section-boss", "Current Boss"], ["section-simulation", "Simulation"], ["section-import", "Import stats"], ["section-multipliers", "Multipliers"], ["section-titan-soul", "Titan Soul"], ["section-raid-card", "Raid Card"], ["section-gem-stone", "Gem Stone"], ["section-card-vault", "Card Vault"] ].map(([id, label]) => <button key={id} className="side-btn" type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}>{label}</button>)}
+          {[ ["section-players", "Players"], ["section-live-boss", "Current Boss"], ["section-boss", "Sims Boss Data"], ["section-simulation", "Simulation"], ["section-import", "Import stats"], ["section-multipliers", "Multipliers"], ["section-titan-soul", "Titan Soul"], ["section-raid-card", "Raid Card"], ["section-gem-stone", "Gem Stone"], ["section-card-vault", "Card Vault"] ].map(([id, label]) => <button key={id} className="side-btn" type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}>{label}</button>)}
         </aside>
         <main className="content">
-          <div className="page-header admin-heading"><span className="eyebrow">Local debug controls</span><h1>Tap Titans Admin</h1><p>Create players and manage current-state stats, boss data, and simulations.</p></div>
+          <div className="page-header admin-heading"><span className="eyebrow">Local debug controls</span><h1>Tap Titans Admin</h1><p>Create players and manage current-state stats, live boss status, sims boss data, and simulations.</p></div>
           {error && <div className="error-box sticky-message" role="alert">{error}</div>}
           {notice && <div className="success-box sticky-message" role="status">{notice}</div>}
 
@@ -321,6 +357,7 @@ export default function TapTitanAdmin() {
             </div>}
           </section>
 
+          <div className="section-gap"><LiveCurrentBossPanel boss={liveBoss} refreshing={liveBossRefreshing} onRefresh={refreshLiveBoss} /></div>
           <div className="section-gap"><BossEditor value={boss} onChange={setBoss} onSave={saveBoss} saving={busy === "boss"} /></div>
           <section id="section-simulation" className="panel scroll-target section-gap">
             <div className="panel-heading-row"><div><h2 className="panel-title">Selected-player Simulation</h2><p className="panel-desc">Force a simulation for only the selected player. Status refreshes every two seconds.</p></div><button className="calc-btn" type="button" disabled={!selectedPlayerId || busy === "force" || busy === "force-all"} onClick={forceSimulation}>{busy === "force" ? "Queueing…" : "Force selected player run"}</button></div>

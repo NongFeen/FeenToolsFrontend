@@ -151,13 +151,13 @@ export default function PlayerRecommendations() {
       pendingScrollPositionRef.current = null;
       setRecommendationsLoading(true);
     });
-    Promise.allSettled([api.player(playerId), api.currentBoss(), api.cards()]).then(
+    Promise.allSettled([api.player(playerId), api.simsBoss(), api.cards()]).then(
       ([playerResult, bossResult, cardsResult]) => {
         if (!active) return;
         if (playerResult.status === "fulfilled") setPlayer(playerResult.value);
         else setPageError(errorMessage(playerResult.reason, "Could not load this player."));
         if (bossResult.status === "fulfilled") setBoss(bossResult.value);
-        else setBossError(errorMessage(bossResult.reason, "No current boss is available."));
+        else setBossError(errorMessage(bossResult.reason, "No sims boss data is available."));
         if (cardsResult.status === "fulfilled") setCards(cardsResult.value);
         setLoading(false);
       },
@@ -237,7 +237,7 @@ export default function PlayerRecommendations() {
           <dl className="profile-facts">
             <div><dt>Stats revision</dt><dd>{player.stats_revision ?? "Missing"}</dd></div>
             <div><dt>Auto sims</dt><dd>{player.auto_sims ? "Enabled" : "Disabled"}</dd></div>
-            <div><dt>Current boss</dt><dd>{boss?.boss_data.boss_name ?? "Missing"}</dd></div>
+            <div><dt>Sims boss</dt><dd>{boss?.boss_data.boss_name ?? "Missing"}</dd></div>
           </dl>
         </header>
 

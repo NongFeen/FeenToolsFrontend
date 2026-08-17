@@ -30,7 +30,7 @@ export default function TapTitanDebug() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([api.players(), api.cards(), api.currentBoss()])
+    Promise.all([api.players(), api.cards(), api.simsBoss()])
       .then(([loadedPlayers, loadedCards, loadedBoss]) => {
         if (!active) return;
         setPlayers(loadedPlayers);

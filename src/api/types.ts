@@ -167,6 +167,24 @@ export interface CurrentBoss {
   updated_at: string;
 }
 
+export interface LiveCurrentBossPart {
+  part_id: string;
+  current_hp: number;
+}
+
+export interface LiveCurrentBoss {
+  clan_code: string;
+  raid_id: number;
+  cycle: number;
+  titan_index: number;
+  boss_data: {
+    enemy_id: string;
+    current_hp: number;
+    parts: LiveCurrentBossPart[];
+  };
+  received_at: string;
+}
+
 export interface SimPatternResult {
   pattern: string;
   average_damage: number;

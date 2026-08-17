@@ -1391,6 +1391,53 @@ button:disabled {
   grid-template-columns: repeat(3, minmax(190px, 1fr));
   gap: 1rem;
 }
+
+.live-boss-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.live-boss-facts div,
+.live-boss-part {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  padding: 0.75rem;
+}
+
+.live-boss-facts dt,
+.live-boss-part span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.live-boss-facts dd {
+  margin: 0.2rem 0 0;
+  font-weight: 700;
+}
+
+.live-boss-parts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.live-boss-part {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.live-boss-empty {
+  margin-top: 1rem;
+}
+.live-boss-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
 .boss-options-grid small {
   color: var(--text-muted);
   font-size: 0.68rem;
@@ -1594,6 +1641,10 @@ input[aria-invalid="true"] {
   .boss-options-grid,
   .boss-group-helper-grid {
     grid-template-columns: 1fr;
+  }
+  .live-boss-facts,
+  .live-boss-parts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .boss-group-helper-heading {
     align-items: stretch;
