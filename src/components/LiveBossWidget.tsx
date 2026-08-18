@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties, FocusEvent } from "react";
+import type { CSSProperties, FocusEvent, KeyboardEvent, PointerEvent } from "react";
 import { useLocation } from "react-router-dom";
 import { ApiError, api } from "../api/client";
 import "../styles/live-boss-widget.css";
@@ -10,6 +10,8 @@ import type {
 } from "../api/types";
 
 const BOSS_IMAGE = "/assets/taptitan/bosses/Raid_Boss_Prikers.png";
+const MIN_WIDGET_WIDTH = 240;
+const MAX_WIDGET_WIDTH = 520;
 
 const PART_LABELS: Record<BossPartName, string> = {
   Head: "Head",
@@ -70,7 +72,13 @@ export default function LiveBossWidget() {
   const [boss, setBoss] = useState<LiveCurrentBoss | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [widgetWidth, setWidgetWidth] = useState<number | null>(null);
+  const [isResizing, setIsResizing] = useState(false);
+  const widgetRef = useRef<HTMLElement | null>(null);
   const wasOpen = useRef(false);
+  const resizeStart = useRef<{ pointerX: number; width: number } | null>(null);
+  const resizeFrame = useRef<number | null>(null);
+  const pendingResizeWidth = useRef<number | null>(null);
   const isOpen = pinned || (!suppressOpen && (hovered || focused));
   const isTapTitanRoute = pathname.startsWith("/tools/taptitan");
 
@@ -97,6 +105,10 @@ export default function LiveBossWidget() {
     wasOpen.current = isOpen;
   }, [isOpen, refreshBoss]);
 
+  useEffect(() => () => {
+    if (resizeFrame.current !== null) cancelAnimationFrame(resizeFrame.current);
+  }, []);
+
   if (!isTapTitanRoute) return null;
 
   const handleClick = () => {
@@ -122,6 +134,62 @@ export default function LiveBossWidget() {
     }
   };
 
+  const clampWidgetWidth = (width: number) =>
+    Math.min(MAX_WIDGET_WIDTH, Math.max(MIN_WIDGET_WIDTH, Math.min(width, window.innerWidth - 24)));
+
+  const handleResizeStart = (event: PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeStart.current = {
+      pointerX: event.clientX,
+      width: event.currentTarget.parentElement?.getBoundingClientRect().width ?? MIN_WIDGET_WIDTH,
+    };
+    pendingResizeWidth.current = resizeStart.current.width;
+    setIsResizing(true);
+  };
+
+  const handleResizeMove = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!resizeStart.current) return;
+    const nextWidth = resizeStart.current.width + resizeStart.current.pointerX - event.clientX;
+    pendingResizeWidth.current = clampWidgetWidth(nextWidth);
+    if (resizeFrame.current !== null) return;
+    resizeFrame.current = requestAnimationFrame(() => {
+      if (widgetRef.current && pendingResizeWidth.current !== null) {
+        widgetRef.current.style.width = `min(${pendingResizeWidth.current}px, calc(100vw - 24px))`;
+      }
+      resizeFrame.current = null;
+    });
+  };
+
+  const handleResizeEnd = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (resizeFrame.current !== null) {
+      cancelAnimationFrame(resizeFrame.current);
+      resizeFrame.current = null;
+    }
+    if (pendingResizeWidth.current !== null) {
+      setWidgetWidth(pendingResizeWidth.current);
+    }
+    pendingResizeWidth.current = null;
+    resizeStart.current = null;
+    setIsResizing(false);
+  };
+
+  const handleResizeKey = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const change = event.key === "ArrowLeft" || event.key === "ArrowUp"
+      ? 20
+      : event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? -20
+        : 0;
+    if (!change) return;
+    event.preventDefault();
+    const currentWidth = event.currentTarget.parentElement?.getBoundingClientRect().width
+      ?? MIN_WIDGET_WIDTH;
+    setWidgetWidth(clampWidgetWidth(currentWidth + change));
+  };
+
   const statusMessage = message
     ?? (boss && !boss.display_parts
       ? "Waiting for matching sub-cycle boss data."
@@ -134,7 +202,11 @@ export default function LiveBossWidget() {
 
   return (
     <aside
-      className={`live-boss-widget${isOpen ? " is-open" : ""}${pinned ? " is-pinned" : ""}`}
+      ref={widgetRef}
+      className={`live-boss-widget${isOpen ? " is-open" : ""}${pinned ? " is-pinned" : ""}${isResizing ? " is-resizing" : ""}`}
+      style={isOpen && widgetWidth
+        ? { width: `min(${widgetWidth}px, calc(100vw - 24px))` }
+        : undefined}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={handleMouseLeave}
       onFocusCapture={() => setFocused(true)}
@@ -173,6 +245,18 @@ export default function LiveBossWidget() {
           </span>
         )}
       </button>
+      {isOpen && (
+        <button
+          className="live-boss-widget-resize-handle"
+          type="button"
+          aria-label="Resize live boss widget. Use arrow keys or drag."
+          onPointerDown={handleResizeStart}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeEnd}
+          onPointerCancel={handleResizeEnd}
+          onKeyDown={handleResizeKey}
+        />
+      )}
     </aside>
   );
 }

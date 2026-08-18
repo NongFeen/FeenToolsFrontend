@@ -12,6 +12,12 @@
   width: clamp(240px, 18vw, 310px);
 }
 
+.live-boss-widget.is-resizing {
+  user-select: none;
+  transition: none;
+  will-change: width;
+}
+
 .live-boss-widget-button {
   width: 100%;
   display: flex;
@@ -160,31 +166,31 @@
 }
 .live-boss-widget-bar-torso {
   left: 50%;
-  top: 40%;
+  top: 45%;
 }
 .live-boss-widget-bar-left-shoulder {
-  left: 25%;
-  top: 34%;
+  left: 15%;
+  top: 25%;
 }
 .live-boss-widget-bar-right-shoulder {
-  left: 75%;
-  top: 34%;
+  left: 85%;
+  top: 25%;
 }
 .live-boss-widget-bar-left-hand {
   left: 15%;
-  top: 58%;
+  top: 55%;
 }
 .live-boss-widget-bar-right-hand {
   left: 85%;
-  top: 58%;
+  top: 55%;
 }
 .live-boss-widget-bar-left-leg {
-  left: 38%;
-  top: 79%;
+  left: 30%;
+  top: 80%;
 }
 .live-boss-widget-bar-right-leg {
-  left: 62%;
-  top: 79%;
+  left: 70%;
+  top: 80%;
 }
 
 .live-boss-widget-status {
@@ -200,6 +206,37 @@
 .live-boss-widget-status.is-error {
   color: #8e321f;
   background: #fff0ee;
+}
+
+.live-boss-widget-resize-handle {
+  position: absolute;
+  bottom: -7px;
+  left: -7px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 2px 6px rgba(35, 31, 25, 0.3);
+  cursor: nesw-resize;
+  touch-action: none;
+}
+
+.live-boss-widget-resize-handle::before {
+  content: "";
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  width: 7px;
+  height: 7px;
+  border-bottom: 2px solid #fff;
+  border-left: 2px solid #fff;
+}
+
+.live-boss-widget-resize-handle:hover {
+  background: var(--accent-hover);
 }
 
 @media (max-width: 640px) {
