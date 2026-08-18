@@ -206,6 +206,12 @@ button:disabled {
 .panel-heading-row .panel-desc {
   margin-bottom: 1rem;
 }
+.simulation-status-heading {
+  align-items: center;
+}
+.inline-refresh-error {
+  margin-bottom: 1rem;
+}
 
 .btn-primary,
 .calc-btn,

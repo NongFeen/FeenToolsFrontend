@@ -51,6 +51,8 @@ export default function PlayerRecommendations() {
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [bossError, setBossError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
   const completedJobRef = useRef("");
   const recommendationRequestRef = useRef(0);
   const recommendationsInitializedRef = useRef(false);
@@ -60,7 +62,7 @@ export default function PlayerRecommendations() {
   const includeBodyPhase = recommendationMode === "combined";
   const recommendationKey = `${deckCount}:${recommendationMode}`;
 
-  const loadRecommendations = useCallback(async () => {
+  const loadRecommendations = useCallback(async (preserveExisting = false) => {
     const requestId = ++recommendationRequestRef.current;
     if (!recommendationsInitializedRef.current) {
       setRecommendationsLoading(true);
@@ -110,7 +112,9 @@ export default function PlayerRecommendations() {
       if (recommendationRequestRef.current !== requestId) return;
 
       pendingScrollPositionRef.current = window.scrollY;
-      setRecommendations((current) => ({ ...current, [recommendationKey]: null }));
+      if (!preserveExisting) {
+        setRecommendations((current) => ({ ...current, [recommendationKey]: null }));
+      }
       setRecommendationErrors((current) => ({
         ...current,
         [recommendationKey]:
@@ -129,6 +133,39 @@ export default function PlayerRecommendations() {
       }
     }
   }, [deckCount, includeBodyPhase, mustIncludeMirrorForce, mustIncludeTeamTactics, playerId, recommendationKey]);
+
+  const refreshCurrentData = useCallback(async () => {
+    setRefreshing(true);
+    setRefreshError("");
+    const [jobsResult, bossResult] = await Promise.allSettled([
+      api.playerJobs(playerId),
+      api.simsBoss(),
+    ]);
+
+    if (bossResult.status === "fulfilled") {
+      setBoss(bossResult.value);
+      setBossError("");
+    } else {
+      setRefreshError(errorMessage(bossResult.reason, "Could not refresh Sims Boss data."));
+    }
+
+    if (jobsResult.status === "fulfilled") {
+      const newest = jobsResult.value[0] ?? null;
+      setLatestJob(newest);
+      setJobsReady(true);
+      if (newest?.status === "completed") {
+        completedJobRef.current = newest.id;
+        generatedDeckCountsRef.current.clear();
+        await loadRecommendations(true);
+      }
+    } else {
+      setJobsReady(true);
+      setRefreshError((current) =>
+        current || errorMessage(jobsResult.reason, "Could not refresh simulation status."),
+      );
+    }
+    setRefreshing(false);
+  }, [loadRecommendations, playerId]);
 
   useLayoutEffect(() => {
     const scrollPosition = pendingScrollPositionRef.current;
@@ -187,7 +224,7 @@ export default function PlayerRecommendations() {
       if (newest?.status === "completed" && completedJobRef.current !== newest.id) {
         completedJobRef.current = newest.id;
         generatedDeckCountsRef.current.clear();
-        void loadRecommendations();
+        void loadRecommendations(true);
       }
     },
     onError: () => setJobsReady(true),
@@ -248,6 +285,21 @@ export default function PlayerRecommendations() {
         )}
         {bossError && <div className="notice-box">{bossError}</div>}
         <section className="panel section-gap">
+          <div className="panel-heading-row simulation-status-heading">
+            <div>
+              <h2 className="panel-title">Simulation status</h2>
+              <p className="panel-desc">Refresh to check for a newly queued automatic simulation.</p>
+            </div>
+            <button
+              type="button"
+              className="calc-btn"
+              onClick={() => void refreshCurrentData()}
+              disabled={refreshing}
+            >
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
+          {refreshError && <div className="error-box inline-refresh-error">{refreshError}</div>}
           <JobStatus job={latestJob} />
           {latestJob?.status === "failed" && (
             <p className="muted-copy">
@@ -326,7 +378,10 @@ export default function PlayerRecommendations() {
             recommendation={recommendations[recommendationKey] ?? null}
             cards={cards}
             playerCards={player.stats?.card_list ?? []}
-            loading={recommendationsLoading || generatingRecommendation}
+            loading={
+              (recommendationsLoading || generatingRecommendation)
+              && !recommendations[recommendationKey]
+            }
             error={recommendationErrors[recommendationKey] ?? ""}
             damageMultiplier={damageMultiplier}
             moralePercent={moralePercent}
