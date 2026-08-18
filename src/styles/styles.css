@@ -1391,6 +1391,11 @@ button:disabled {
   grid-template-columns: repeat(3, minmax(190px, 1fr));
   gap: 1rem;
 }
+.boss-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
 
 .live-boss-facts {
   display: grid;
@@ -1645,6 +1650,22 @@ input[aria-invalid="true"] {
   .live-boss-facts,
   .live-boss-parts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .live-boss-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .live-boss-actions button {
+    width: 100%;
+  }
+  .boss-editor-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .boss-editor-actions button {
+    width: 100%;
   }
   .boss-group-helper-heading {
     align-items: stretch;

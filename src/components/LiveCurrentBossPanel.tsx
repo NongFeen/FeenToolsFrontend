@@ -12,6 +12,25 @@ const formatHp = (value: number) =>
     maximumFractionDigits: 3,
   }).format(value);
 
+const LIVE_PART_LABELS: Record<string, string> = {
+  BodyHead: "Head body",
+  ArmorHead: "Head armor",
+  BodyChestUpper: "Torso body",
+  ArmorChestUpper: "Torso armor",
+  BodyArmUpperRight: "Left shoulder body",
+  ArmorArmUpperRight: "Left shoulder armor",
+  BodyArmUpperLeft: "Right shoulder body",
+  ArmorArmUpperLeft: "Right shoulder armor",
+  BodyHandRight: "Left hand body",
+  ArmorHandRight: "Left hand armor",
+  BodyHandLeft: "Right hand body",
+  ArmorHandLeft: "Right hand armor",
+  BodyLegUpperRight: "Left leg body",
+  ArmorLegUpperRight: "Left leg armor",
+  BodyLegUpperLeft: "Right leg body",
+  ArmorLegUpperLeft: "Right leg armor",
+};
+
 export default function LiveCurrentBossPanel({ boss, refreshing, onRefresh }: Props) {
   return (
     <section id="section-live-boss" className="panel scroll-target">
@@ -51,7 +70,7 @@ export default function LiveCurrentBossPanel({ boss, refreshing, onRefresh }: Pr
           <div className="live-boss-parts" aria-label="Live boss part health">
             {boss.boss_data.parts.map((part) => (
               <div key={part.part_id} className="live-boss-part">
-                <span>{part.part_id}</span>
+                <span>{LIVE_PART_LABELS[part.part_id] ?? part.part_id}</span>
                 <strong>{formatHp(part.current_hp)}</strong>
               </div>
             ))}

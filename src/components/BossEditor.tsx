@@ -63,11 +63,13 @@ interface Props {
   value: CurrentBoss;
   onChange: (value: CurrentBoss) => void;
   onSave?: () => void;
+  onLoadCurrentBoss?: () => void;
+  canLoadCurrentBoss?: boolean;
   saving?: boolean;
   mode?: "current" | "debug";
 }
 
-export default function BossEditor({ value, onChange, onSave, saving = false, mode = "current" }: Props) {
+export default function BossEditor({ value, onChange, onSave, onLoadCurrentBoss, canLoadCurrentBoss = false, saving = false, mode = "current" }: Props) {
   const debugMode = mode === "debug";
   const cursedPartCount = PARTS.filter(({ key }) => value.boss_data[key].part_state === "Cursed").length;
   const curseReductionPercent = cursedPartCount * 6;
@@ -116,7 +118,10 @@ export default function BossEditor({ value, onChange, onSave, saving = false, mo
     <section id={debugMode ? "debug-boss" : "section-boss"} className="panel scroll-target">
       <div className="panel-heading-row">
         <div><h2 className="panel-title">{debugMode ? "Debug Boss Setup" : "Sims Boss Data"}</h2><p className="panel-desc">{debugMode ? "Used only for this single-deck run. It does not change the saved sims boss." : "Editable boss input used by simulations. Saving clears old simulation results and does not start a new run."}</p></div>
-        {!debugMode && onSave && <button className="calc-btn" type="button" disabled={saving || value.attackable_parts.length === 0} onClick={onSave}>{saving ? "Saving…" : "Save sims boss"}</button>}
+        {!debugMode && <div className="boss-editor-actions">
+          {onLoadCurrentBoss && <button className="secondary-btn" type="button" disabled={!canLoadCurrentBoss || saving} onClick={onLoadCurrentBoss}>Load Current Boss values</button>}
+          {onSave && <button className="calc-btn" type="button" disabled={saving || value.attackable_parts.length === 0} onClick={onSave}>{saving ? "Saving…" : "Save sims boss"}</button>}
+        </div>}
       </div>
       <div className="boss-options-grid">
         <label className="field">
