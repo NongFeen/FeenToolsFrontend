@@ -172,6 +172,13 @@ export interface LiveCurrentBossPart {
   current_hp: number;
 }
 
+export interface LiveBossDisplayPart {
+  part_name: BossPartName;
+  part_state: PartState;
+  current_hp: number;
+  max_hp: number;
+}
+
 export interface LiveCurrentBoss {
   clan_code: string;
   raid_id: number;
@@ -183,6 +190,7 @@ export interface LiveCurrentBoss {
     parts: LiveCurrentBossPart[];
   };
   received_at: string;
+  display_parts: LiveBossDisplayPart[] | null;
 }
 
 export interface SimPatternResult {

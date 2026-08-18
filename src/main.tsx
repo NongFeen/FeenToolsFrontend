@@ -7,10 +7,12 @@ import TapTitan from "./pages/TapTitan";
 import PlayerRecommendations from "./pages/PlayerRecommendations";
 import TapTitanAdmin from "./pages/TapTitanAdmin";
 import TapTitanDebug from "./pages/TapTitanDebug";
+import LiveBossWidget from "./components/LiveBossWidget";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
+      <LiveBossWidget />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/tools/taptitan" element={<TapTitan />} />
