@@ -130,6 +130,24 @@
   transform: translate(-50%, -50%);
 }
 
+.live-boss-widget-untargeted {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e32620;
+  font-size: clamp(1.25rem, 2.2vw, 2rem);
+  font-weight: 700;
+  line-height: 1;
+  text-shadow:
+    0 1px 0 #fff,
+    1px 0 0 #fff,
+    0 -1px 0 #fff,
+    -1px 0 0 #fff,
+    0 2px 5px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+}
+
 .live-boss-widget-bar-fill {
   position: absolute;
   inset: 0 auto 0 0;

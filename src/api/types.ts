@@ -177,6 +177,7 @@ export interface LiveBossDisplayPart {
   part_state: PartState;
   current_hp: number;
   max_hp: number;
+  is_targeted: boolean;
 }
 
 export interface LiveCurrentBoss {

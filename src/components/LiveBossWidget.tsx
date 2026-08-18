@@ -42,11 +42,22 @@ const formatHp = (value: number) =>
   }).format(value);
 
 function HealthBar({ part }: { part: LiveBossDisplayPart }) {
+  const partLabel = PART_LABELS[part.part_name];
+  if (!part.is_targeted) {
+    return (
+      <span
+        className={`live-boss-widget-untargeted live-boss-widget-bar-${PART_CLASSES[part.part_name]}`}
+        role="img"
+        aria-label={`${partLabel} is not targeted`}
+      >
+        X
+      </span>
+    );
+  }
   if (part.part_state === "Skeleton") return null;
   const percent = part.max_hp > 0
     ? Math.min(100, Math.max(0, (part.current_hp / part.max_hp) * 100))
     : 0;
-  const partLabel = PART_LABELS[part.part_name];
 
   return (
     <span
@@ -196,7 +207,9 @@ export default function LiveBossWidget() {
       : null);
   const bossDescription = isOpen && boss?.display_parts
     ? boss.display_parts
-      .map((part) => `${PART_LABELS[part.part_name]} ${part.part_state}, ${formatHp(part.current_hp)} of ${formatHp(part.max_hp)} health`)
+      .map((part) => part.is_targeted
+        ? `${PART_LABELS[part.part_name]} targeted, ${part.part_state}, ${formatHp(part.current_hp)} of ${formatHp(part.max_hp)} health`
+        : `${PART_LABELS[part.part_name]} not targeted`)
       .join("; ")
     : "";
 
