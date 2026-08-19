@@ -4,10 +4,11 @@ import { api, ApiError, assetUrl } from "../api/client";
 import type {
   CardDefinition,
   PlayerSummary,
+  RaidCycle,
   Recommendation,
 } from "../api/types";
 import Navbar from "../components/Navbar";
-import { useRaidMoraleDefault } from "../hooks/useRaidMoraleDefault";
+import RaidResetCountdown from "../components/RaidResetCountdown";
 
 interface DeckPreview {
   loading: boolean;
@@ -116,7 +117,8 @@ export default function TapTitan() {
   const [cards, setCards] = useState<CardDefinition[]>([]);
   const [search, setSearch] = useState("");
   const [moralePercent, setMoralePercent] = useState(0);
-  const setEditableMoralePercent = useRaidMoraleDefault(setMoralePercent);
+  const [raidCycle, setRaidCycle] = useState<RaidCycle | null>(null);
+  const [raidCycleLoading, setRaidCycleLoading] = useState(true);
   const [loyaltyPercent, setLoyaltyPercent] = useState(34);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -135,6 +137,8 @@ export default function TapTitan() {
     useState(true);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewRequestsRef = useRef(new Set<string>());
+  const raidCycleRequestRef = useRef<Promise<RaidCycle> | null>(null);
+  const moraleManuallyEditedRef = useRef(false);
   const damageMultiplier =
     (1 + moralePercent / 100) * (1 + loyaltyPercent / 100);
 
@@ -214,6 +218,28 @@ export default function TapTitan() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    raidCycleRequestRef.current ??= api.currentRaidCycle();
+    raidCycleRequestRef.current
+      .then((cycle) => {
+        if (!active) return;
+        setRaidCycle(cycle);
+        if (!moraleManuallyEditedRef.current) {
+          setMoralePercent(
+            Math.min(100, Math.max(0, cycle.default_morale_percent)),
+          );
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setRaidCycleLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const currentSummary = summarizeRecommendations(
     players,
     clanRecommendations,
@@ -241,7 +267,8 @@ export default function TapTitan() {
       previewRequestsRef.current.has(player.player_id) ||
       deckPreviews[player.player_id]?.recommendation ||
       deckPreviews[player.player_id]?.loading
-    ) return;
+    )
+      return;
     previewRequestsRef.current.add(player.player_id);
     setDeckPreviews((current) => ({
       ...current,
@@ -294,7 +321,10 @@ export default function TapTitan() {
       );
   };
 
-  const playersInPreviewRange = (player: PlayerSummary, anchor: HTMLElement) => {
+  const playersInPreviewRange = (
+    player: PlayerSummary,
+    anchor: HTMLElement,
+  ) => {
     const grid = anchor.parentElement;
     const currentIndex = filteredPlayers.findIndex(
       (candidate) => candidate.player_id === player.player_id,
@@ -353,10 +383,6 @@ export default function TapTitan() {
         <div className="page-header">
           <span className="eyebrow">Tap Titans 2</span>
           <h1>Kero Clan deck recommendations</h1>
-          <p>
-            Select a player to view their current boss simulation and optimized
-            six- or nine-deck lineup.
-          </p>
         </div>
         <section
           className="clan-recommendation-summary"
@@ -373,11 +399,12 @@ export default function TapTitan() {
                   max={100}
                   step={1}
                   value={moralePercent}
-                  onChange={(event) =>
-                    setEditableMoralePercent(
+                  onChange={(event) => {
+                    moraleManuallyEditedRef.current = true;
+                    setMoralePercent(
                       clampPercent(event.currentTarget.valueAsNumber, 100),
-                    )
-                  }
+                    );
+                  }}
                 />
               </label>
               <label className="damage-percent-control">
@@ -449,6 +476,10 @@ export default function TapTitan() {
                     : ""}
                 </small>
               </div>
+              <RaidResetCountdown
+                cycle={raidCycle}
+                loading={raidCycleLoading}
+              />
             </>
           )}
         </section>
@@ -460,7 +491,7 @@ export default function TapTitan() {
           <div className="panel empty-state">
             <h2>No players yet</h2>
             <p>
-              Create a player from the admin page before requesting
+              Fetch clan player data from the admin page before requesting
               recommendations.
             </p>
             <Link className="btn-primary" to="/tools/taptitan/admin">
@@ -579,9 +610,15 @@ export default function TapTitan() {
                                           {level !== undefined && (
                                             <small className="card-level-badge">
                                               Lv {level}
-                                              {Boolean(definition?.seasonal_level_boost) && (
+                                              {Boolean(
+                                                definition?.seasonal_level_boost,
+                                              ) && (
                                                 <span className="seasonal-level-inline">
-                                                  +{definition!.seasonal_level_boost}
+                                                  +
+                                                  {
+                                                    definition!
+                                                      .seasonal_level_boost
+                                                  }
                                                 </span>
                                               )}
                                             </small>

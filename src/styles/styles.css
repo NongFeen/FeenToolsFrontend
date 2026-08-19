@@ -158,6 +158,37 @@ button:disabled {
   max-width: 680px;
   color: var(--text-muted);
 }
+.raid-reset-card {
+  width: min(100%, 100%);
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.25rem;
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.raid-reset-card div {
+  display: grid;
+  gap: 0.2rem;
+}
+.raid-reset-card span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.raid-reset-card strong {
+  font-size: 0.94rem;
+}
+.raid-reset-countdown {
+  min-width: 7ch;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.15rem !important;
+  text-align: right;
+}
 .eyebrow {
   display: block;
   color: var(--accent);
@@ -1564,6 +1595,13 @@ input[aria-invalid="true"] {
 }
 
 @media (max-width: 640px) {
+  .raid-reset-card {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  .raid-reset-countdown {
+    text-align: left;
+  }
   .batch-timing-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
