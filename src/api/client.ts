@@ -86,11 +86,6 @@ const playerPath = (playerId: string) =>
 export const api = {
   health: () => request<HealthResponse>("/api/health"),
   players: () => request<PlayerSummary[]>("/api/players"),
-  createPlayer: (body: {
-    player_id: string;
-    display_name: string;
-    auto_sims: boolean;
-  }) => request<PlayerSummary>("/api/players", { method: "POST", body: json(body) }),
   player: (playerId: string) => request<PlayerDetail>(playerPath(playerId)),
   currentStats: (playerId: string) =>
     request<PlayerStatsVersion>(`${playerPath(playerId)}/stats/current`),
@@ -126,9 +121,9 @@ export const api = {
     request<Tt2PlayerStatus>("/internal/tt2/player-status", {}, true),
   tt2ClanStatus: () =>
     request<Tt2ClanStatus>("/internal/tt2/clan-status", {}, true),
-  fetchClanStats: (playerId: string) =>
+  fetchClanStats: () =>
     request<Tt2ClanFetchResult>(
-      `/internal/players/${encodeURIComponent(playerId)}/fetch-clan-stats`,
+      "/internal/tt2/fetch-clan-stats",
       { method: "POST" },
       true,
     ),

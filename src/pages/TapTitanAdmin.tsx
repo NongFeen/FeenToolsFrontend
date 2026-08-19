@@ -48,11 +48,10 @@ export default function TapTitanAdmin() {
   const [boss, setBoss] = useState<CurrentBoss>(makeDefaultBoss);
   const [liveBoss, setLiveBoss] = useState<LiveCurrentBoss | null>(null);
   const [liveBossRefreshing, setLiveBossRefreshing] = useState(false);
-  const [createForm, setCreateForm] = useState({ player_id: "", display_name: "", player_token: "", auto_sims: false });
   const [playerToken, setPlayerToken] = useState("");
   const [tt2Status, setTt2Status] = useState<Tt2PlayerStatus>({ configured: false, connected: false, raid_connected: false });
   const [tt2ClanStatus, setTt2ClanStatus] = useState<Tt2ClanStatus | null>(null);
-  const [elapsedClanCooldown, setElapsedClanCooldown] = useState<string | null>(null);
+  const [clanCooldownClock, setClanCooldownClock] = useState(() => Date.now());
   const [rawInput, setRawInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -124,7 +123,7 @@ export default function TapTitanAdmin() {
     const nextFetchAt = tt2ClanStatus?.next_fetch_at;
     if (!nextFetchAt) return;
     const delay = Math.max(0, new Date(nextFetchAt).getTime() - Date.now());
-    const timeoutId = window.setTimeout(() => setElapsedClanCooldown(nextFetchAt), delay);
+    const timeoutId = window.setTimeout(() => setClanCooldownClock(Date.now()), delay);
     return () => window.clearTimeout(timeoutId);
   }, [tt2ClanStatus?.next_fetch_at]);
 
@@ -215,17 +214,6 @@ export default function TapTitanAdmin() {
     resetMessages();
   };
 
-  const createPlayer = async (event: React.FormEvent) => {
-    event.preventDefault(); resetMessages(); setBusy("create");
-    try {
-      const playerToken = createForm.player_token.trim();
-      const created = await api.createPlayer({ player_id: createForm.player_id.trim(), display_name: createForm.display_name.trim(), auto_sims: createForm.auto_sims });
-      if (playerToken) await api.updatePlayerToken(created.player_id, playerToken);
-      await refreshPlayers(); setCreateForm({ player_id: "", display_name: "", player_token: "", auto_sims: false }); selectPlayer(created.player_id); setNotice(`${created.display_name} was created${playerToken ? " with a configured TT2 token" : ""}.`);
-    } catch (reason) { setError(messageFor(reason, "Could not create player.")); }
-    finally { setBusy(""); }
-  };
-
   const savePlayerToken = async () => {
     resetMessages();
     if (!selectedPlayerId || !playerToken.trim()) { setError("Select a player and enter a player token."); return; }
@@ -261,10 +249,9 @@ export default function TapTitanAdmin() {
 
   const fetchClanPlayerData = async () => {
     resetMessages();
-    if (!selectedPlayerId) { setError("Select the clan Master or Grand Master player first."); return; }
     setBusy("fetch-clan");
     try {
-      const result = await api.fetchClanStats(selectedPlayerId);
+      const result = await api.fetchClanStats();
       setTt2ClanStatus({
         clan_code: result.clan_code,
         clan_name: result.clan_name,
@@ -273,10 +260,12 @@ export default function TapTitanAdmin() {
         last_player_count: result.player_count,
       });
       await refreshPlayers();
-      try {
-        const selectedStats = await api.currentStats(selectedPlayerId);
-        setStats({ ...selectedStats.stats, title: selectedStats.stats.title ?? 0 });
-      } catch { /* The selected token owner may no longer be returned as a clan member. */ }
+      if (selectedPlayerId) {
+        try {
+          const selectedStats = await api.currentStats(selectedPlayerId);
+          setStats({ ...selectedStats.stats, title: selectedStats.stats.title ?? 0 });
+        } catch { /* The selected player may no longer be returned as a clan member. */ }
+      }
       setNotice(`Clan data updated for ${result.clan_name}: ${result.created_players} players created and ${result.updated_players} updated.`);
     } catch (reason) {
       setError(messageFor(reason, "Could not fetch TT2 clan player data."));
@@ -375,7 +364,7 @@ export default function TapTitanAdmin() {
 
   const selected = players.find((player) => player.player_id === selectedPlayerId);
   const clanNextFetchAt = tt2ClanStatus?.next_fetch_at ? new Date(tt2ClanStatus.next_fetch_at) : null;
-  const clanFetchCoolingDown = Boolean(tt2ClanStatus?.next_fetch_at && elapsedClanCooldown !== tt2ClanStatus.next_fetch_at);
+  const clanFetchCoolingDown = Boolean(clanNextFetchAt && clanNextFetchAt.getTime() > clanCooldownClock);
   if (loading) return <div className="page"><Navbar /><main className="page-shell"><div className="panel empty-state">Loading admin tools…</div></main></div>;
 
   return (
@@ -387,19 +376,12 @@ export default function TapTitanAdmin() {
           {[ ["section-players", "Players"], ["section-live-boss", "Current Boss"], ["section-boss", "Sims Boss Data"], ["section-simulation", "Simulation"], ["section-import", "Import stats"], ["section-multipliers", "Multipliers"], ["section-titan-soul", "Titan Soul"], ["section-raid-card", "Raid Card"], ["section-gem-stone", "Gem Stone"], ["section-card-vault", "Card Vault"] ].map(([id, label]) => <button key={id} className="side-btn" type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}>{label}</button>)}
         </aside>
         <main className="content">
-          <div className="page-header admin-heading"><span className="eyebrow">Local debug controls</span><h1>Tap Titans Admin</h1><p>Create players and manage current-state stats, live boss status, sims boss data, and simulations.</p></div>
+          <div className="page-header admin-heading"><span className="eyebrow">Local debug controls</span><h1>Tap Titans Admin</h1><p>Manage clan players, current-state stats, live boss status, sims boss data, and simulations.</p></div>
           {error && <div className="error-box sticky-message" role="alert">{error}</div>}
           {notice && <div className="success-box sticky-message" role="status">{notice}</div>}
 
           <section id="section-players" className="panel scroll-target">
-            <h2 className="panel-title">Players</h2><p className="panel-desc">Create a player, then select an existing player for every stats or simulation action.</p>
-            <form className="create-player-form" onSubmit={createPlayer}>
-              <label className="field"><span>Player ID</span><input required value={createForm.player_id} onChange={(event) => setCreateForm({ ...createForm, player_id: event.target.value })} placeholder="933qd64" /></label>
-              <label className="field"><span>Display name</span><input required value={createForm.display_name} onChange={(event) => setCreateForm({ ...createForm, display_name: event.target.value })} placeholder="Feen" /></label>
-              <label className="field"><span>Player token (optional)</span><input type="password" autoComplete="off" value={createForm.player_token} onChange={(event) => setCreateForm({ ...createForm, player_token: event.target.value })} placeholder="Stored encrypted; never displayed again" /></label>
-              <label className="check-row form-check"><input type="checkbox" checked={createForm.auto_sims} onChange={(event) => setCreateForm({ ...createForm, auto_sims: event.target.checked })} /><span>Auto simulations</span></label>
-              <button className="calc-btn" disabled={busy === "create"}>{busy === "create" ? "Creating…" : "Create player"}</button>
-            </form>
+            <h2 className="panel-title">Players</h2><p className="panel-desc">Players are populated from clan data. Select an existing player for stats or simulation actions.</p>
             <div className="selection-row">
               <label className="field"><span>Existing player</span><select value={selectedPlayerId} onChange={(event) => selectPlayer(event.target.value)}><option value="">Select a player…</option>{players.map((player) => <option key={player.player_id} value={player.player_id}>{player.display_name}</option>)}</select></label>
               <button className="secondary-btn" type="button" disabled={!selected || busy === "auto"} onClick={toggleAutoSims}>{selected ? `Auto sims: ${selected.auto_sims ? "On" : "Off"}` : "Auto sims"}</button>
@@ -465,12 +447,12 @@ export default function TapTitanAdmin() {
             <div className="panel-heading-row">
               <div>
                 <h2 className="panel-title">TT2 Clan Player Data</h2>
-                <p className="panel-desc">Select a clan Master or Grand Master with a configured token. This creates missing clan players and refreshes every returned player’s stats.</p>
+                <p className="panel-desc">Uses the configured raid subscription account to create missing clan players and refresh every returned player’s stats.</p>
               </div>
               <button
                 className="calc-btn"
                 type="button"
-                disabled={!selected || !selected.has_player_token || selected.player_token_status === "invalid" || !tt2Status.raid_connected || clanFetchCoolingDown || busy === "fetch-clan"}
+                disabled={!tt2Status.raid_connected || clanFetchCoolingDown || busy === "fetch-clan"}
                 onClick={fetchClanPlayerData}
               >
                 {busy === "fetch-clan" ? "Fetching clan…" : "Fetch clan player data"}
