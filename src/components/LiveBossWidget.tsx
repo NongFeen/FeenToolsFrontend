@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, FocusEvent, KeyboardEvent, PointerEvent } from "react";
 import { useLocation } from "react-router-dom";
 import { ApiError, api } from "../api/client";
@@ -86,35 +86,49 @@ export default function LiveBossWidget() {
   const [widgetWidth, setWidgetWidth] = useState<number | null>(null);
   const [isResizing, setIsResizing] = useState(false);
   const widgetRef = useRef<HTMLElement | null>(null);
-  const wasOpen = useRef(false);
   const resizeStart = useRef<{ pointerX: number; width: number } | null>(null);
   const resizeFrame = useRef<number | null>(null);
   const pendingResizeWidth = useRef<number | null>(null);
   const isOpen = pinned || (!suppressOpen && (hovered || focused));
   const isTapTitanRoute = pathname.startsWith("/tools/taptitan");
 
-  const refreshBoss = useCallback(async () => {
-    setRefreshing(true);
-    setMessage(null);
-    try {
-      const nextBoss = await api.liveCurrentBoss();
-      setBoss(nextBoss);
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        setBoss(null);
-        setMessage("Waiting for the next attack event.");
-      } else {
-        setMessage(error instanceof Error ? error.message : "Could not refresh the current boss.");
-      }
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
-
   useEffect(() => {
-    if (isOpen && !wasOpen.current) void refreshBoss();
-    wasOpen.current = isOpen;
-  }, [isOpen, refreshBoss]);
+    if (!isOpen) return;
+    let cancelled = false;
+
+    const fetchBoss = async () => {
+      setRefreshing(true);
+      setMessage(null);
+      try {
+        const nextBoss = await api.liveCurrentBoss();
+        if (!cancelled) {
+          setBoss(prev =>
+            !nextBoss.display_parts && prev?.raid_id === nextBoss.raid_id && prev?.display_parts
+              ? { ...nextBoss, display_parts: prev.display_parts }
+              : nextBoss,
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          if (error instanceof ApiError && error.status === 404) {
+            setBoss(null);
+            setMessage("Waiting for the next attack event.");
+          } else {
+            setMessage(error instanceof Error ? error.message : "Could not refresh the current boss.");
+          }
+        }
+      } finally {
+        if (!cancelled) setRefreshing(false);
+      }
+    };
+
+    void fetchBoss();
+    const id = setInterval(() => void fetchBoss(), 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [isOpen]);
 
   useEffect(() => () => {
     if (resizeFrame.current !== null) cancelAnimationFrame(resizeFrame.current);
