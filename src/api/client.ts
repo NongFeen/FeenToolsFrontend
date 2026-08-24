@@ -130,7 +130,7 @@ export const api = {
   playerJobs: (playerId: string) =>
     request<SimulationJob[]>(`${playerPath(playerId)}/simulation-jobs`),
   currentBoss: () => request<CurrentBoss>("/api/current-boss"),
-  simsBoss: () => request<CurrentBoss>("/api/sims-boss"),
+  simsBoss: () => request<CurrentBoss>("/api/current-boss"),
   liveCurrentBoss: () => request<LiveCurrentBoss>("/api/live-current-boss"),
   currentRaidCycle: () => request<RaidCycle>("/api/raid-cycle/current"),
   recommendation: (
@@ -157,15 +157,6 @@ export const api = {
   updateBoss: (boss_data: BossData, attackable_parts: BossPartName[]) =>
     request<BossUpdateAccepted>(
       "/internal/current-boss",
-      {
-        method: "PUT",
-        body: json({ boss_data, attackable_parts, run_sims: false }),
-      },
-      true,
-    ),
-  updateSimsBoss: (boss_data: BossData, attackable_parts: BossPartName[]) =>
-    request<BossUpdateAccepted>(
-      "/internal/sims-boss",
       {
         method: "PUT",
         body: json({ boss_data, attackable_parts, run_sims: false }),

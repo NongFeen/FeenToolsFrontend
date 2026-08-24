@@ -1,38 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
-import type { BossName, BossPart, CardDefinition, CurrentBoss, LiveCurrentBoss, PlayerRaidData, PlayerSummary, SimulationBatch, SimulationJob, Tt2ClanStatus, Tt2PlayerStatus } from "../api/types";
-import BossEditor from "../components/BossEditor";
+import type { CardDefinition, LiveCurrentBoss, PlayerRaidData, PlayerSummary, SimulationBatch, SimulationJob, Tt2ClanStatus, Tt2PlayerStatus } from "../api/types";
 import JobStatus from "../components/JobStatus";
 import LiveCurrentBossPanel from "../components/LiveCurrentBossPanel";
 import Navbar from "../components/Navbar";
 import StatsEditor from "../components/StatsEditor";
 import { usePolling } from "../hooks/usePolling";
-import { isActiveJob, makeDefaultBoss } from "../utils/taptitan";
+import { isActiveJob } from "../utils/taptitan";
 
 const messageFor = (error: unknown, fallback: string) => error instanceof ApiError ? error.message : fallback;
 const BATCH_STORAGE_KEY = "taptitan.latestSimulationBatchId";
-const LIVE_ENEMY_NAMES: Record<string, BossName> = {
-  Enemy1: "Lojak",
-  Enemy2: "Takedar",
-  Enemy3: "Jukk",
-  Enemy4: "Sterl",
-  Enemy5: "Mohaca",
-  Enemy6: "Terro",
-  Enemy7: "Klonk",
-  Enemy8: "Priker",
-};
-const withLiveValues = (part: BossPart, armorValue: number, healthValue: number): BossPart => {
-  const currentArmor = Math.max(0, Math.round(armorValue));
-  const currentHealth = Math.max(0, Math.round(healthValue));
-  return {
-    ...part,
-    part_state: currentArmor > 0
-      ? part.part_state === "Cursed" ? "Cursed" : "Armor"
-      : currentHealth > 0 ? "Body" : "Skeleton",
-    current_armor: currentArmor,
-    current_health: currentHealth,
-  };
-};
 const formatDuration = (milliseconds: number) => {
   const seconds = milliseconds / 1_000;
   if (seconds < 60) return `${seconds.toFixed(2)}s`;
@@ -45,7 +22,6 @@ export default function TapTitanAdmin() {
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [cards, setCards] = useState<CardDefinition[]>([]);
   const [stats, setStats] = useState<PlayerRaidData | null>(null);
-  const [boss, setBoss] = useState<CurrentBoss>(makeDefaultBoss);
   const [liveBoss, setLiveBoss] = useState<LiveCurrentBoss | null>(null);
   const [liveBossRefreshing, setLiveBossRefreshing] = useState(false);
   const [playerToken, setPlayerToken] = useState("");
@@ -74,22 +50,12 @@ export default function TapTitanAdmin() {
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([api.players(), api.cards(), api.simsBoss(), api.tt2PlayerStatus(), api.tt2ClanStatus(), api.liveCurrentBoss()]).then(([playersResult, cardsResult, bossResult, tt2Result, clanStatusResult, liveBossResult]) => {
+    Promise.allSettled([api.players(), api.cards(), api.tt2PlayerStatus(), api.tt2ClanStatus(), api.liveCurrentBoss()]).then(([playersResult, cardsResult, tt2Result, clanStatusResult, liveBossResult]) => {
       if (!active) return;
       if (playersResult.status === "fulfilled") setPlayers(playersResult.value);
       else setError(messageFor(playersResult.reason, "Could not load players."));
       if (cardsResult.status === "fulfilled") setCards(cardsResult.value);
       else setError(messageFor(cardsResult.reason, "Could not load card definitions."));
-      if (bossResult.status === "fulfilled") setBoss({
-        ...bossResult.value,
-        boss_data: {
-          ...bossResult.value.boss_data,
-          global_raid_modifier: bossResult.value.boss_data.global_raid_modifier ?? "None",
-          global_raid_modifier_amount: bossResult.value.boss_data.global_raid_modifier_amount ?? null,
-          curse_damage_per_curse: bossResult.value.boss_data.curse_damage_per_curse ?? 0.06,
-        },
-      });
-      else if (!(bossResult.reason instanceof ApiError && bossResult.reason.status === 404)) setError(messageFor(bossResult.reason, "Could not load sims boss data."));
       if (tt2Result.status === "fulfilled") setTt2Status(tt2Result.value);
       if (clanStatusResult.status === "fulfilled") setTt2ClanStatus(clanStatusResult.value);
       if (liveBossResult.status === "fulfilled") setLiveBoss(liveBossResult.value);
@@ -162,10 +128,7 @@ export default function TapTitanAdmin() {
     resetMessages();
     setLiveBossRefreshing(true);
     try {
-      const [liveResult, simsResult] = await Promise.allSettled([api.liveCurrentBoss(), api.simsBoss()]);
-      if (liveResult.status === "rejected") throw liveResult.reason;
-      setLiveBoss(liveResult.value);
-      if (simsResult.status === "fulfilled") setBoss(simsResult.value);
+      setLiveBoss(await api.liveCurrentBoss());
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 404) {
         setLiveBoss(null);
@@ -176,35 +139,6 @@ export default function TapTitanAdmin() {
     } finally {
       setLiveBossRefreshing(false);
     }
-  };
-  const loadCurrentBossValues = () => {
-    resetMessages();
-    if (!liveBoss) {
-      setError("Refresh Current Boss Data before loading its values.");
-      return;
-    }
-    const hp = new Map(liveBoss.boss_data.parts.map((part) => [part.part_id, part.current_hp]));
-    const mergePart = (part: BossPart, bodyId: string, armorId: string) => withLiveValues(
-      part,
-      hp.get(armorId) ?? part.current_armor,
-      hp.get(bodyId) ?? part.current_health,
-    );
-    setBoss((current) => ({
-      ...current,
-      boss_data: {
-        ...current.boss_data,
-        boss_name: LIVE_ENEMY_NAMES[liveBoss.boss_data.enemy_id] ?? current.boss_data.boss_name,
-        head: mergePart(current.boss_data.head, "BodyHead", "ArmorHead"),
-        torso: mergePart(current.boss_data.torso, "BodyChestUpper", "ArmorChestUpper"),
-        right_shoulder: mergePart(current.boss_data.right_shoulder, "BodyArmUpperLeft", "ArmorArmUpperLeft"),
-        left_shoulder: mergePart(current.boss_data.left_shoulder, "BodyArmUpperRight", "ArmorArmUpperRight"),
-        right_hand: mergePart(current.boss_data.right_hand, "BodyHandLeft", "ArmorHandLeft"),
-        left_hand: mergePart(current.boss_data.left_hand, "BodyHandRight", "ArmorHandRight"),
-        right_leg: mergePart(current.boss_data.right_leg, "BodyLegUpperLeft", "ArmorLegUpperLeft"),
-        left_leg: mergePart(current.boss_data.left_leg, "BodyLegUpperRight", "ArmorLegUpperRight"),
-      },
-    }));
-    setNotice("Current Boss values were loaded into the Sims Boss Data number boxes. They are not saved yet.");
   };
   const selectPlayer = (playerId: string) => {
     setSelectedPlayerId(playerId);
@@ -309,17 +243,6 @@ export default function TapTitanAdmin() {
     finally { setBusy(""); }
   };
 
-  const saveBoss = async () => {
-    resetMessages(); setBusy("boss");
-    try {
-      const response = await api.updateSimsBoss({ ...boss.boss_data, global_raid_modifier_amount: null, curse_damage_per_curse: 0.06 }, boss.attackable_parts);
-      setBoss((current) => ({ ...current, boss_data: { ...current.boss_data, global_raid_modifier_amount: null, curse_damage_per_curse: 0.06 } }));
-      setForceJobId(""); setForceJob(null); setNotice(response.message);
-    }
-    catch (reason) { setError(messageFor(reason, "Could not save sims boss data.")); }
-    finally { setBusy(""); }
-  };
-
   const forceSimulation = async () => {
     resetMessages(); setForceError("");
     if (!selectedPlayerId) { setError("Select a player before forcing a simulation."); return; }
@@ -373,7 +296,7 @@ export default function TapTitanAdmin() {
       <div className="layout admin-layout">
         <aside className="sidebar admin-sidebar" aria-label="Admin sections">
           <p className="sidebar-label">Admin</p>
-          {[ ["section-players", "Players"], ["section-live-boss", "Current Boss"], ["section-boss", "Sims Boss Data"], ["section-simulation", "Simulation"], ["section-import", "Import stats"], ["section-multipliers", "Multipliers"], ["section-titan-soul", "Titan Soul"], ["section-raid-card", "Raid Card"], ["section-gem-stone", "Gem Stone"], ["section-card-vault", "Card Vault"] ].map(([id, label]) => <button key={id} className="side-btn" type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}>{label}</button>)}
+          {[ ["section-players", "Players"], ["section-live-boss", "Current Boss"], ["section-simulation", "Simulation"], ["section-import", "Import stats"], ["section-multipliers", "Multipliers"], ["section-titan-soul", "Titan Soul"], ["section-raid-card", "Raid Card"], ["section-gem-stone", "Gem Stone"], ["section-card-vault", "Card Vault"] ].map(([id, label]) => <button key={id} className="side-btn" type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}>{label}</button>)}
         </aside>
         <main className="content">
           <div className="page-header admin-heading"><span className="eyebrow">Local debug controls</span><h1>Tap Titans Admin</h1><p>Manage clan players, current-state stats, live boss status, sims boss data, and simulations.</p></div>
@@ -394,7 +317,6 @@ export default function TapTitanAdmin() {
           </section>
 
           <div className="section-gap"><LiveCurrentBossPanel boss={liveBoss} refreshing={liveBossRefreshing} onRefresh={refreshLiveBoss} /></div>
-          <div className="section-gap"><BossEditor value={boss} onChange={setBoss} onSave={saveBoss} onLoadCurrentBoss={loadCurrentBossValues} canLoadCurrentBoss={Boolean(liveBoss)} saving={busy === "boss"} /></div>
           <section id="section-simulation" className="panel scroll-target section-gap">
             <div className="panel-heading-row"><div><h2 className="panel-title">Selected-player Simulation</h2><p className="panel-desc">Force a simulation for only the selected player. Status refreshes every two seconds.</p></div><button className="calc-btn" type="button" disabled={!selectedPlayerId || busy === "force" || busy === "force-all"} onClick={forceSimulation}>{busy === "force" ? "Queueing…" : "Force selected player run"}</button></div>
             <label className="check-row body-phase-option"><input type="checkbox" checked={includeBodyPhase} disabled={busy === "force" || busy === "force-all"} onChange={(event) => setIncludeBodyPhase(event.target.checked)} /><span>Also simulate targeted parts as Body</span></label>
