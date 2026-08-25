@@ -8,6 +8,7 @@ import type {
   DebugSimulationResponse,
   HealthResponse,
   JobAccepted,
+  LiveAttackingPlayer,
   LiveCurrentBoss,
   PlayerDetail,
   PlayerRaidData,
@@ -132,6 +133,8 @@ export const api = {
   currentBoss: () => request<CurrentBoss>("/api/current-boss"),
   simsBoss: () => request<CurrentBoss>("/api/current-boss"),
   liveCurrentBoss: () => request<LiveCurrentBoss>("/api/live-current-boss"),
+  liveAttackingPlayers: () =>
+    request<LiveAttackingPlayer[]>("/api/live-attacking-players"),
   currentRaidCycle: () => request<RaidCycle>("/api/raid-cycle/current"),
   recommendation: (
     playerId: string,

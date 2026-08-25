@@ -1,8 +1,5 @@
 .live-boss-widget {
-  position: fixed;
-  top: 76px;
-  right: 16px;
-  z-index: 90;
+  position: relative;
   width: 68px;
   filter: drop-shadow(0 8px 18px rgba(35, 31, 25, 0.2));
   transition: width var(--transition);
@@ -258,18 +255,7 @@
 }
 
 @media (max-width: 640px) {
-  .live-boss-widget {
-    top: 88px;
-    right: 12px;
-  }
-
   .live-boss-widget.is-open {
     width: min(320px, calc(100vw - 24px));
-  }
-}
-
-@media (max-width: 420px) {
-  .live-boss-widget {
-    top: 126px;
   }
 }
