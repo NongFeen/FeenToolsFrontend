@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
-import type { CardDefinition, LiveCurrentBoss, PlayerRaidData, PlayerSummary, SimulationBatch, SimulationJob, Tt2ClanStatus, Tt2PlayerStatus } from "../api/types";
+import type { CardDefinition, CurrentBoss, LiveCurrentBoss, PlayerRaidData, PlayerSummary, SimulationBatch, SimulationJob, Tt2ClanStatus, Tt2PlayerStatus } from "../api/types";
+import BossEditor from "../components/BossEditor";
 import JobStatus from "../components/JobStatus";
 import LiveCurrentBossPanel from "../components/LiveCurrentBossPanel";
 import Navbar from "../components/Navbar";
 import StatsEditor from "../components/StatsEditor";
 import { usePolling } from "../hooks/usePolling";
-import { isActiveJob } from "../utils/taptitan";
+import { isActiveJob, syncBossFromLiveBoss } from "../utils/taptitan";
 
 const messageFor = (error: unknown, fallback: string) => error instanceof ApiError ? error.message : fallback;
 const BATCH_STORAGE_KEY = "taptitan.latestSimulationBatchId";
@@ -24,6 +25,7 @@ export default function TapTitanAdmin() {
   const [stats, setStats] = useState<PlayerRaidData | null>(null);
   const [liveBoss, setLiveBoss] = useState<LiveCurrentBoss | null>(null);
   const [liveBossRefreshing, setLiveBossRefreshing] = useState(false);
+  const [currentBoss, setCurrentBoss] = useState<CurrentBoss | null>(null);
   const [playerToken, setPlayerToken] = useState("");
   const [tt2Status, setTt2Status] = useState<Tt2PlayerStatus>({ configured: false, connected: false, raid_connected: false });
   const [tt2ClanStatus, setTt2ClanStatus] = useState<Tt2ClanStatus | null>(null);
@@ -50,7 +52,7 @@ export default function TapTitanAdmin() {
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([api.players(), api.cards(), api.tt2PlayerStatus(), api.tt2ClanStatus(), api.liveCurrentBoss()]).then(([playersResult, cardsResult, tt2Result, clanStatusResult, liveBossResult]) => {
+    Promise.allSettled([api.players(), api.cards(), api.tt2PlayerStatus(), api.tt2ClanStatus(), api.liveCurrentBoss(), api.currentBoss()]).then(([playersResult, cardsResult, tt2Result, clanStatusResult, liveBossResult, currentBossResult]) => {
       if (!active) return;
       if (playersResult.status === "fulfilled") setPlayers(playersResult.value);
       else setError(messageFor(playersResult.reason, "Could not load players."));
@@ -59,6 +61,7 @@ export default function TapTitanAdmin() {
       if (tt2Result.status === "fulfilled") setTt2Status(tt2Result.value);
       if (clanStatusResult.status === "fulfilled") setTt2ClanStatus(clanStatusResult.value);
       if (liveBossResult.status === "fulfilled") setLiveBoss(liveBossResult.value);
+      if (currentBossResult.status === "fulfilled") setCurrentBoss(currentBossResult.value);
       setLoading(false);
     });
     return () => { active = false; };
@@ -243,6 +246,27 @@ export default function TapTitanAdmin() {
     finally { setBusy(""); }
   };
 
+  const saveBoss = async () => {
+    resetMessages();
+    if (!currentBoss) return;
+    setBusy("boss");
+    try {
+      await api.updateBoss(currentBoss.boss_data, currentBoss.attackable_parts);
+      setNotice("Sims boss data saved. Old simulation results were cleared.");
+    } catch (reason) {
+      setError(messageFor(reason, "Could not save sims boss data."));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const syncBossFromLive = () => {
+    resetMessages();
+    if (!currentBoss || !liveBoss) return;
+    setCurrentBoss(syncBossFromLiveBoss(currentBoss, liveBoss));
+    setNotice("Sims boss synced from the live Current Boss panel. Review and save to persist.");
+  };
+
   const forceSimulation = async () => {
     resetMessages(); setForceError("");
     if (!selectedPlayerId) { setError("Select a player before forcing a simulation."); return; }
@@ -296,7 +320,7 @@ export default function TapTitanAdmin() {
       <div className="layout admin-layout">
         <aside className="sidebar admin-sidebar" aria-label="Admin sections">
           <p className="sidebar-label">Admin</p>
-          {[ ["section-players", "Players"], ["section-live-boss", "Current Boss"], ["section-simulation", "Simulation"], ["section-import", "Import stats"], ["section-multipliers", "Multipliers"], ["section-titan-soul", "Titan Soul"], ["section-raid-card", "Raid Card"], ["section-gem-stone", "Gem Stone"], ["section-card-vault", "Card Vault"] ].map(([id, label]) => <button key={id} className="side-btn" type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}>{label}</button>)}
+          {[ ["section-players", "Players"], ["section-live-boss", "Current Boss"], ["section-boss", "Sims Boss"], ["section-simulation", "Simulation"], ["section-import", "Import stats"], ["section-multipliers", "Multipliers"], ["section-titan-soul", "Titan Soul"], ["section-raid-card", "Raid Card"], ["section-gem-stone", "Gem Stone"], ["section-card-vault", "Card Vault"] ].map(([id, label]) => <button key={id} className="side-btn" type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}>{label}</button>)}
         </aside>
         <main className="content">
           <div className="page-header admin-heading"><span className="eyebrow">Local debug controls</span><h1>Tap Titans Admin</h1><p>Manage clan players, current-state stats, live boss status, sims boss data, and simulations.</p></div>
@@ -317,6 +341,9 @@ export default function TapTitanAdmin() {
           </section>
 
           <div className="section-gap"><LiveCurrentBossPanel boss={liveBoss} refreshing={liveBossRefreshing} onRefresh={refreshLiveBoss} /></div>
+          {currentBoss
+            ? <div className="section-gap"><BossEditor value={currentBoss} onChange={setCurrentBoss} onSave={saveBoss} onLoadCurrentBoss={syncBossFromLive} canLoadCurrentBoss={Boolean(liveBoss?.display_parts?.length)} saving={busy === "boss"} mode="current" /></div>
+            : <section id="section-boss" className="panel scroll-target section-gap empty-state">No sims boss data saved yet.</section>}
           <section id="section-simulation" className="panel scroll-target section-gap">
             <div className="panel-heading-row"><div><h2 className="panel-title">Selected-player Simulation</h2><p className="panel-desc">Force a simulation for only the selected player. Status refreshes every two seconds.</p></div><button className="calc-btn" type="button" disabled={!selectedPlayerId || busy === "force" || busy === "force-all"} onClick={forceSimulation}>{busy === "force" ? "Queueing…" : "Force selected player run"}</button></div>
             <label className="check-row body-phase-option"><input type="checkbox" checked={includeBodyPhase} disabled={busy === "force" || busy === "force-all"} onChange={(event) => setIncludeBodyPhase(event.target.checked)} /><span>Also simulate targeted parts as Body</span></label>

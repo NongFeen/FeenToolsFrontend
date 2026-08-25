@@ -8,6 +8,7 @@ import type {
   GlobalRaidModifier,
   PartState,
 } from "../api/types";
+import { enforcePartStateValues } from "../utils/taptitan";
 import ShorthandNumberInput from "./ShorthandNumberInput";
 
 type BossPartKey = Exclude<keyof BossData, "boss_name" | "global_raid_modifier" | "global_raid_modifier_amount" | "curse_type" | "curse_damage_per_curse" | "recommend_1_to_2_part_patterns_only" | "damage_results">;
@@ -37,18 +38,6 @@ const GLOBAL_RAID_MODIFIERS: Array<{ value: GlobalRaidModifier; label: string }>
 
 const LEG_PARTS: BossPartKey[] = ["left_leg", "right_leg"];
 const ARM_PARTS: BossPartKey[] = ["left_shoulder", "right_shoulder", "left_hand", "right_hand"];
-
-const enforcePartStateValues = (part: BossPart): BossPart => {
-  switch (part.part_state) {
-    case "Armor":
-    case "Cursed":
-      return { ...part, current_health: part.max_health };
-    case "Body":
-      return { ...part, current_armor: 0 };
-    case "Skeleton":
-      return { ...part, current_armor: 0, current_health: 0 };
-  }
-};
 
 const isStateControlledCurrentField = (
   state: PartState,
@@ -119,7 +108,7 @@ export default function BossEditor({ value, onChange, onSave, onLoadCurrentBoss,
       <div className="panel-heading-row">
         <div><h2 className="panel-title">{debugMode ? "Debug Boss Setup" : "Sims Boss Data"}</h2><p className="panel-desc">{debugMode ? "Used only for this single-deck run. It does not change the saved sims boss." : "Editable boss input used by simulations. Saving clears old simulation results and does not start a new run."}</p></div>
         {!debugMode && <div className="boss-editor-actions">
-          {onLoadCurrentBoss && <button className="secondary-btn" type="button" disabled={!canLoadCurrentBoss || saving} onClick={onLoadCurrentBoss}>Load Current Boss values</button>}
+          {onLoadCurrentBoss && <button className="secondary-btn" type="button" disabled={!canLoadCurrentBoss || saving} onClick={onLoadCurrentBoss} title="Copies current/max HP and targeted parts from the live Current Boss panel above. boss_name, curse_type, modifiers, and any already-broken part's old max armor are left as-is.">Sync from live boss</button>}
           {onSave && <button className="calc-btn" type="button" disabled={saving || value.attackable_parts.length === 0} onClick={onSave}>{saving ? "Saving…" : "Save sims boss"}</button>}
         </div>}
       </div>
