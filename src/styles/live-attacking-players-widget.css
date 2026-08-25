@@ -58,7 +58,9 @@
   justify-content: center;
   height: 68px;
   color: var(--text);
-  font: 700 1.4rem/1 "DM Serif Display", serif;
+  font:
+    700 1.4rem/1 "DM Serif Display",
+    serif;
 }
 
 .live-attacking-players-list {
@@ -93,9 +95,17 @@
   border-bottom: none;
 }
 
+.live-attacking-players-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .live-attacking-players-name {
   overflow: hidden;
-  font-size: 0.78rem;
+  min-width: 0;
+  font-size: 1.2rem;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -103,6 +113,7 @@
 
 .live-attacking-players-cards {
   display: flex;
+  flex: 0 0 auto;
   gap: 0.3rem;
 }
 
@@ -150,7 +161,8 @@
   transition: width 0.2s linear;
 }
 
-.live-attacking-players-timer.is-ending-soon .live-attacking-players-timer-fill {
+.live-attacking-players-timer.is-ending-soon
+  .live-attacking-players-timer-fill {
   background: #ff9b8a;
 }
 

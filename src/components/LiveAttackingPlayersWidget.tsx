@@ -169,17 +169,19 @@ export default function LiveAttackingPlayersWidget() {
             )}
             {players.map((player) => (
               <span className="live-attacking-players-entry" key={player.player_code}>
-                <span className="live-attacking-players-name">{player.name}</span>
-                <span className="live-attacking-players-cards">
-                  {player.cards.map((card, index) => (
-                    <span className="live-attacking-players-card" key={`${player.player_code}-${index}`}>
-                      {card.image_url ? (
-                        <img src={assetUrl(card.image_url)} alt={card.display_name} loading="lazy" />
-                      ) : (
-                        <span className="live-attacking-players-card-fallback">{card.display_name}</span>
-                      )}
-                    </span>
-                  ))}
+                <span className="live-attacking-players-row">
+                  <span className="live-attacking-players-name">{player.name}</span>
+                  <span className="live-attacking-players-cards">
+                    {player.cards.map((card, index) => (
+                      <span className="live-attacking-players-card" key={`${player.player_code}-${index}`}>
+                        {card.image_url ? (
+                          <img src={assetUrl(card.image_url)} alt={card.display_name} loading="lazy" />
+                        ) : (
+                          <span className="live-attacking-players-card-fallback">{card.display_name}</span>
+                        )}
+                      </span>
+                    ))}
+                  </span>
                 </span>
                 <AttackTimer player={player} onExpire={() => removePlayer(player.player_code)} />
               </span>
