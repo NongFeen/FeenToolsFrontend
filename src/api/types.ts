@@ -194,6 +194,20 @@ export interface LiveCurrentBoss {
   display_parts: LiveBossDisplayPart[] | null;
 }
 
+export interface LiveAttackingCard {
+  card_id: string;
+  display_name: string;
+  image_url: string;
+}
+
+export interface LiveAttackingPlayer {
+  player_code: string;
+  name: string;
+  cards: LiveAttackingCard[];
+  started_at: string;
+  duration_seconds: number;
+}
+
 export interface SimPatternResult {
   pattern: string;
   average_damage: number;
