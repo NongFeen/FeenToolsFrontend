@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, FocusEvent, KeyboardEvent, PointerEvent } from "react";
 import { useLocation } from "react-router-dom";
-import { ApiError, api } from "../api/client";
+import { api } from "../api/client";
 import "../styles/live-boss-widget.css";
 import type {
   BossPartName,
@@ -81,7 +81,6 @@ export default function LiveBossWidget() {
   const [pinned, setPinned] = useState(false);
   const [suppressOpen, setSuppressOpen] = useState(false);
   const [boss, setBoss] = useState<LiveCurrentBoss | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [widgetWidth, setWidgetWidth] = useState<number | null>(null);
   const [isResizing, setIsResizing] = useState(false);
@@ -92,41 +91,58 @@ export default function LiveBossWidget() {
   const isOpen = pinned || (!suppressOpen && (hovered || focused));
   const isTapTitanRoute = pathname.startsWith("/tools/taptitan");
 
+  // The backend pushes the live boss over SSE (a "boss" event right when the
+  // connection opens, then again each time a raid event that could change it
+  // has been processed) instead of the widget polling for it every few
+  // seconds. Only open a connection while the panel is actually visible --
+  // no point holding a stream for a collapsed widget nobody's looking at.
   useEffect(() => {
     if (!isOpen) return;
-    let cancelled = false;
 
-    const fetchBoss = async () => {
-      setRefreshing(true);
-      setMessage(null);
-      try {
-        const nextBoss = await api.liveCurrentBoss();
-        if (!cancelled) {
-          setBoss(prev =>
-            !nextBoss.display_parts && prev?.raid_id === nextBoss.raid_id && prev?.display_parts
-              ? { ...nextBoss, display_parts: prev.display_parts }
-              : nextBoss,
-          );
-        }
-      } catch (error) {
-        if (!cancelled) {
-          if (error instanceof ApiError && error.status === 404) {
-            setBoss(null);
-            setMessage("Waiting for the next attack event.");
-          } else {
-            setMessage(error instanceof Error ? error.message : "Could not refresh the current boss.");
-          }
-        }
-      } finally {
-        if (!cancelled) setRefreshing(false);
+    const source = new EventSource(api.liveCurrentBossStreamUrl());
+
+    let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearDisconnectWarning = () => {
+      if (disconnectTimer !== null) {
+        clearTimeout(disconnectTimer);
+        disconnectTimer = null;
       }
+      setMessage(null);
     };
 
-    void fetchBoss();
-    const id = setInterval(() => void fetchBoss(), 5000);
+    source.addEventListener("boss", (event) => {
+      const raw = (event as MessageEvent<string>).data;
+      try {
+        const nextBoss = raw === "null" ? null : (JSON.parse(raw) as LiveCurrentBoss);
+        clearDisconnectWarning();
+        if (nextBoss === null) {
+          setBoss(null);
+          setMessage("Waiting for the next attack event.");
+          return;
+        }
+        setBoss((prev) =>
+          !nextBoss.display_parts && prev?.raid_id === nextBoss.raid_id && prev?.display_parts
+            ? { ...nextBoss, display_parts: prev.display_parts }
+            : nextBoss,
+        );
+      } catch {
+        // Ignore a malformed payload; the next push will correct it.
+      }
+    });
+
+    source.onopen = clearDisconnectWarning;
+
+    source.onerror = () => {
+      if (disconnectTimer !== null) return;
+      disconnectTimer = setTimeout(() => {
+        disconnectTimer = null;
+        setMessage("Live updates disconnected; reconnecting...");
+      }, 1500);
+    };
+
     return () => {
-      cancelled = true;
-      clearInterval(id);
+      if (disconnectTimer !== null) clearTimeout(disconnectTimer);
+      source.close();
     };
   }, [isOpen]);
 
@@ -266,9 +282,9 @@ export default function LiveBossWidget() {
           ))}
           {!isOpen && <span className="live-boss-widget-collapsed-label">Boss</span>}
         </span>
-        {isOpen && (refreshing || statusMessage) && (
+        {isOpen && statusMessage && (
           <span className={`live-boss-widget-status${message ? " is-error" : ""}`}>
-            {refreshing ? "Refreshing current boss..." : statusMessage}
+            {statusMessage}
           </span>
         )}
       </button>
