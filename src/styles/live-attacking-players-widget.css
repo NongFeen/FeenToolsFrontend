@@ -1,5 +1,4 @@
 .live-attacking-players-widget {
-  --entry-transition: 320ms ease;
   width: 68px;
   filter: drop-shadow(0 8px 18px rgba(35, 31, 25, 0.2));
   transition: width var(--transition);
@@ -44,13 +43,34 @@
     serif;
 }
 
-.live-attacking-players-pin {
+.live-attacking-players-heading-right {
+  display: flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.live-attacking-players-pin {
   color: var(--accent);
   font-size: 0.6rem;
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+}
+
+.live-attacking-players-debug {
+  color: var(--text-muted);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.live-attacking-players-debug:hover,
+.live-attacking-players-debug:focus-visible {
+  color: var(--accent);
 }
 
 .live-attacking-players-badge {
@@ -69,6 +89,10 @@
   flex-direction: column;
   max-height: 60vh;
   overflow-y: auto;
+  /* Reserves the scrollbar's space always, whether or not it's currently
+     needed -- otherwise rows shrinking below the scroll threshold reclaim
+     that width right as they're fading out, and it visibly animates. */
+  scrollbar-gutter: stable;
 }
 
 .live-attacking-players-status {
@@ -84,46 +108,24 @@
   background: #fff0ee;
 }
 
-/* Each entry is a single-row grid track so it can be animated to/from zero
-   height (the "grid-rows accordion" trick) in lock-step with its own
-   opacity fade -- new attacks fade+grow in, expired ones fade+shrink out,
-   and nothing else in the widget re-renders or snaps to a new size. */
+/* Framer Motion drives height/opacity/borderBottomColor (outer) and scaleY
+   (inner) directly via its own animation engine -- no CSS `transition`
+   needed here (and none should be added: a CSS transition racing Motion's
+   own per-frame style updates on the same properties would just fight it). */
 .live-attacking-players-entry {
-  display: grid;
-  grid-template-rows: 1fr;
-  opacity: 1;
+  overflow: hidden;
   border-bottom: 1px solid rgba(43, 39, 33, 0.1);
-  transition:
-    grid-template-rows var(--entry-transition),
-    opacity var(--entry-transition),
-    border-color var(--entry-transition);
 }
 
 .live-attacking-players-entry:last-child {
   border-bottom: none;
 }
 
-.live-attacking-players-entry.is-entering,
-.live-attacking-players-entry.is-leaving {
-  grid-template-rows: 0fr;
-  opacity: 0;
-  border-color: transparent;
-}
-
 .live-attacking-players-entry-inner {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  min-height: 0;
-  overflow: hidden;
   padding: 0.5rem 0.65rem;
-  transition: padding var(--entry-transition);
-}
-
-.live-attacking-players-entry.is-entering .live-attacking-players-entry-inner,
-.live-attacking-players-entry.is-leaving .live-attacking-players-entry-inner {
-  padding-top: 0;
-  padding-bottom: 0;
 }
 
 .live-attacking-players-row {
