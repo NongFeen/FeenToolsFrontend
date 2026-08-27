@@ -79,7 +79,7 @@ export default function RecommendationDecks({
       <div className="recommendation-grid">
         {sortedDecks.map((deck, index) => {
           const pattern = deck.result?.best_pattern;
-          const deckCards = deck.cards?.length ? deck.cards : deck.result?.deck ?? [];
+          const deckCards = deck.cards ?? [];
           return (
             <article className="deck-card" key={`${deck.position}-${index}`}>
               <div className="deck-heading"><div className="deck-number">Deck {index + 1}</div></div>

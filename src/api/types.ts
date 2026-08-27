@@ -208,26 +208,34 @@ export interface LiveAttackingPlayer {
   duration_seconds: number;
 }
 
+// The live debug endpoint (TapTitanDebug) returns the full shape below, but
+// a persisted-then-reconstructed recommendation result only ever carries
+// `pattern`/`lowest_round_damage`/`highest_round_damage`/`card_damage` (with
+// `card_damage` limited to `card`+`average_damage`) -- everything else is
+// either reconstructible elsewhere (deck/deck_names from card_mask,
+// average_damage from the deck's own top-level field) or debug-only
+// formatting the recommendation view never reads. All the debug-only
+// fields are optional here so one type safely describes both shapes.
 export interface SimPatternResult {
   pattern: string;
-  average_damage: number;
-  average_damage_display: string;
+  average_damage?: number;
+  average_damage_display?: string;
   lowest_round_damage: number;
-  lowest_round_damage_display: string;
+  lowest_round_damage_display?: string;
   highest_round_damage: number;
-  highest_round_damage_display: string;
+  highest_round_damage_display?: string;
   card_damage?: SimCardDamageResult[];
 }
 
 export interface SimCardDamageResult {
   card: string;
-  card_name: string;
+  card_name?: string;
   average_damage: number;
-  average_damage_display: string;
+  average_damage_display?: string;
 }
 
 export interface SimDeckResult {
-  deck: string[];
+  deck?: string[];
   deck_names?: string[];
   total_attack_patterns?: number;
   best_pattern: SimPatternResult | null;
