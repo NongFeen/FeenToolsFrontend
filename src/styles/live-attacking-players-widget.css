@@ -43,13 +43,34 @@
     serif;
 }
 
-.live-attacking-players-pin {
+.live-attacking-players-heading-right {
+  display: flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.live-attacking-players-pin {
   color: var(--accent);
   font-size: 0.6rem;
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+}
+
+.live-attacking-players-debug {
+  color: var(--text-muted);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.live-attacking-players-debug:hover,
+.live-attacking-players-debug:focus-visible {
+  color: var(--accent);
 }
 
 .live-attacking-players-badge {
@@ -68,6 +89,10 @@
   flex-direction: column;
   max-height: 60vh;
   overflow-y: auto;
+  /* Reserves the scrollbar's space always, whether or not it's currently
+     needed -- otherwise rows shrinking below the scroll threshold reclaim
+     that width right as they're fading out, and it visibly animates. */
+  scrollbar-gutter: stable;
 }
 
 .live-attacking-players-status {
@@ -83,16 +108,24 @@
   background: #fff0ee;
 }
 
+/* Framer Motion drives height/opacity/borderBottomColor (outer) and scaleY
+   (inner) directly via its own animation engine -- no CSS `transition`
+   needed here (and none should be added: a CSS transition racing Motion's
+   own per-frame style updates on the same properties would just fight it). */
 .live-attacking-players-entry {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  padding: 0.5rem 0.65rem;
+  overflow: hidden;
   border-bottom: 1px solid rgba(43, 39, 33, 0.1);
 }
 
 .live-attacking-players-entry:last-child {
   border-bottom: none;
+}
+
+.live-attacking-players-entry-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.65rem;
 }
 
 .live-attacking-players-row {

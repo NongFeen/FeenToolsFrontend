@@ -133,8 +133,10 @@ export const api = {
   currentBoss: () => request<CurrentBoss>("/api/current-boss"),
   simsBoss: () => request<CurrentBoss>("/api/current-boss"),
   liveCurrentBoss: () => request<LiveCurrentBoss>("/api/live-current-boss"),
+  liveCurrentBossStreamUrl: () => `${baseUrl}/api/live-current-boss/stream`,
   liveAttackingPlayers: () =>
     request<LiveAttackingPlayer[]>("/api/live-attacking-players"),
+  liveAttackingPlayersStreamUrl: () => `${baseUrl}/api/live-attacking-players/stream`,
   currentRaidCycle: () => request<RaidCycle>("/api/raid-cycle/current"),
   recommendation: (
     playerId: string,
