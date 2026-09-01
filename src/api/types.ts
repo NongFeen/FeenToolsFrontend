@@ -60,30 +60,6 @@ export interface PlayerStatsVersion {
   updated_at: string;
 }
 
-export interface Tt2PlayerStatus {
-  configured: boolean;
-  connected: boolean;
-  raid_connected: boolean;
-}
-
-export interface Tt2ClanStatus {
-  clan_code: string | null;
-  clan_name: string | null;
-  last_fetched_at: string | null;
-  next_fetch_at: string | null;
-  last_player_count: number;
-}
-
-export interface Tt2ClanFetchResult {
-  clan_code: string;
-  clan_name: string;
-  created_players: number;
-  updated_players: number;
-  player_count: number;
-  last_fetched_at: string;
-  next_fetch_at: string;
-}
-
 export interface SimulationJob {
   id: string;
   player_id: string;
@@ -256,13 +232,6 @@ export interface SimDeckResult {
   patterns?: SimPatternResult[];
 }
 
-export interface DebugSimulationResponse {
-  rounds_per_pattern: number;
-  ticks_per_round: number;
-  total_taps: number;
-  result: SimDeckResult;
-}
-
 export interface RecommendedDeck {
   position: number;
   cards: string[];
@@ -304,45 +273,6 @@ export interface RaidCycle {
   default_morale_percent: number;
   mirror_force_boost: number;
   updated_at: string;
-}
-
-export interface JobAccepted {
-  job_id: string;
-  created: boolean;
-}
-
-export interface SimulationBatchAccepted {
-  batch_id: string;
-  requested: number;
-  queued: number;
-  existing: number;
-}
-
-export interface SimulationBatch {
-  batch_id: string;
-  status: "running" | "completed" | "completed_with_failures";
-  requested: number;
-  tracked: number;
-  queued: number;
-  pending: number;
-  running: number;
-  optimizing: number;
-  completed: number;
-  failed: number;
-  simulation_time_ms: number;
-  recommendation_time_ms: number;
-  combined_processing_time_ms: number;
-  wall_time_ms: number;
-  created_at: string;
-  completed_at: string | null;
-}
-
-export interface BossUpdateAccepted {
-  status: string;
-  message: string;
-  simulations_triggered: boolean;
-  deleted_jobs: number;
-  created_jobs: string[];
 }
 
 export interface ConvertedPlayerDataResponse {

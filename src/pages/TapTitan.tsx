@@ -490,13 +490,7 @@ export default function TapTitan() {
         {!loading && !error && players.length === 0 && (
           <div className="panel empty-state">
             <h2>No players yet</h2>
-            <p>
-              Fetch clan player data from the admin page before requesting
-              recommendations.
-            </p>
-            <Link className="btn-primary" to="/tools/taptitan/admin">
-              Open admin
-            </Link>
+            <p>Clan player data has not been loaded yet. Check back soon.</p>
           </div>
         )}
         {!loading && !error && players.length > 0 && (

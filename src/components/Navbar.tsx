@@ -15,27 +15,9 @@ export default function Navbar() {
         </Link>
         <Link
           to="/tools/taptitan"
-          className={
-            pathname.startsWith("/tools/taptitan") &&
-            !pathname.startsWith("/tools/taptitan/admin") &&
-            !pathname.startsWith("/tools/taptitan/debug")
-              ? "active"
-              : ""
-          }
+          className={pathname.startsWith("/tools/taptitan") ? "active" : ""}
         >
           Recommendations
-        </Link>
-        <Link
-          to="/tools/taptitan/debug"
-          className={pathname.startsWith("/tools/taptitan/debug") ? "active" : ""}
-        >
-          Sim Debug
-        </Link>
-        <Link
-          to="/tools/taptitan/admin"
-          className={pathname.startsWith("/tools/taptitan/admin") ? "active" : ""}
-        >
-          Admin
         </Link>
       </div>
     </nav>
