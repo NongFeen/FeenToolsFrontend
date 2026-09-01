@@ -180,6 +180,12 @@ export interface LiveBossDisplayPart {
   is_targeted: boolean;
 }
 
+export interface AreaBonus {
+  modifier: GlobalRaidModifier;
+  /** Fractional amount TT2 reported (0.3 = +30%), when known. */
+  amount: number | null;
+}
+
 export interface LiveCurrentBoss {
   clan_code: string;
   raid_id: number;
@@ -192,6 +198,13 @@ export interface LiveCurrentBoss {
   };
   received_at: string;
   display_parts: LiveBossDisplayPart[] | null;
+  /** `null` when the titan carries no active area buff. */
+  area_bonus: AreaBonus | null;
+  /** What kind of damage the curse discounts; "None" when nothing is cursed. */
+  curse_type: CurseType;
+  cursed_part_count: number;
+  /** Negative percentage, e.g. -24 for 4 cursed parts at 6% each; 0 when nothing is cursed. */
+  curse_percent: number;
 }
 
 export interface LiveAttackingCard {

@@ -8,7 +8,7 @@ import type {
   GlobalRaidModifier,
   PartState,
 } from "../api/types";
-import { enforcePartStateValues } from "../utils/taptitan";
+import { CURSE_TYPE_LABELS, enforcePartStateValues, GLOBAL_RAID_MODIFIER_LABELS } from "../utils/taptitan";
 import ShorthandNumberInput from "./ShorthandNumberInput";
 
 type BossPartKey = Exclude<keyof BossData, "boss_name" | "global_raid_modifier" | "global_raid_modifier_amount" | "curse_type" | "curse_damage_per_curse" | "recommend_1_to_2_part_patterns_only" | "damage_results">;
@@ -24,17 +24,9 @@ const PARTS: Array<{ key: BossPartKey; name: BossPartName; label: string }> = [
   { key: "right_leg", name: "RightLeg", label: "Right leg" },
 ];
 
-const GLOBAL_RAID_MODIFIERS: Array<{ value: GlobalRaidModifier; label: string }> = [
-  { value: "None", label: "None" },
-  { value: "BurstDamage", label: "Burst damage ×1.30" },
-  { value: "BurstChance", label: "Burst chance ×1.30" },
-  { value: "SupportEffect", label: "Support effect ×1.15" },
-  { value: "AfflictionChance", label: "Affliction chance ×1.30" },
-  { value: "AfflictionDamage", label: "Affliction damage ×1.30" },
-  { value: "AllDamage", label: "All damage ×1.15" },
-  { value: "AttackDuration", label: "Attack duration +3 seconds" },
-  { value: "AfflictionDuration", label: "Affliction duration ×1.50" },
-];
+const GLOBAL_RAID_MODIFIERS: Array<{ value: GlobalRaidModifier; label: string }> = (
+  Object.entries(GLOBAL_RAID_MODIFIER_LABELS) as Array<[GlobalRaidModifier, string]>
+).map(([value, label]) => ({ value, label }));
 
 const LEG_PARTS: BossPartKey[] = ["left_leg", "right_leg"];
 const ARM_PARTS: BossPartKey[] = ["left_shoulder", "right_shoulder", "left_hand", "right_hand"];
@@ -129,10 +121,9 @@ export default function BossEditor({ value, onChange, onSave, onLoadCurrentBoss,
         <label className="field">
           <span>Curse type</span>
           <select value={value.boss_data.curse_type ?? "None"} onChange={(event) => onChange({ ...value, boss_data: { ...value.boss_data, curse_type: event.target.value as CurseType, curse_damage_per_curse: 0.06 } })}>
-            <option value="None">None</option>
-            <option value="BodyDamage">Body damage</option>
-            <option value="BurstDamage">Burst damage</option>
-            <option value="AfflictionDamage">Affliction damage</option>
+            {(Object.entries(CURSE_TYPE_LABELS) as Array<[CurseType, string]>).map(([curseType, label]) => (
+              <option key={curseType} value={curseType}>{label}</option>
+            ))}
           </select>
           <small>{cursedPartCount} cursed {cursedPartCount === 1 ? "part" : "parts"} = {curseReductionPercent}% damage reduction.</small>
         </label>
