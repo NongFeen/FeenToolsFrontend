@@ -8,6 +8,7 @@ import type {
   LiveBossDisplayPart,
   LiveCurrentBoss,
 } from "../api/types";
+import { CURSE_TYPE_LABELS, GLOBAL_RAID_MODIFIER_LABELS } from "../utils/taptitan";
 
 const BOSS_IMAGE = "/assets/taptitan/bosses/Raid_Boss_Prikers.png";
 const MIN_WIDGET_WIDTH = 240;
@@ -269,6 +270,14 @@ export default function LiveBossWidget() {
             <span>
               <strong>Current Boss</strong>
               {boss && <small>{boss.boss_data.enemy_id} - Titan {boss.titan_index}</small>}
+              {boss?.area_bonus && (
+                <small>Area: {GLOBAL_RAID_MODIFIER_LABELS[boss.area_bonus.modifier]}</small>
+              )}
+              {boss && boss.cursed_part_count > 0 && (
+                <small>
+                  Cursed: {CURSE_TYPE_LABELS[boss.curse_type]}, {boss.cursed_part_count} ({boss.curse_percent.toFixed(0)}%)
+                </small>
+              )}
             </span>
             <span className="live-boss-widget-pin" aria-hidden="true">
               {pinned ? "Pinned" : "Click to pin"}

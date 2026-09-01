@@ -1,6 +1,25 @@
-import type { BossPart, BossPartName, CurrentBoss, LiveCurrentBoss, SimulationJob } from "../api/types";
+import type { BossPart, BossPartName, CurrentBoss, CurseType, GlobalRaidModifier, LiveCurrentBoss, SimulationJob } from "../api/types";
 
 const ACTIVE_JOB_STATUSES = new Set(["pending", "running", "optimizing"]);
+
+export const GLOBAL_RAID_MODIFIER_LABELS: Record<GlobalRaidModifier, string> = {
+  None: "None",
+  BurstDamage: "Burst damage ×1.30",
+  BurstChance: "Burst chance ×1.30",
+  SupportEffect: "Support effect ×1.15",
+  AfflictionChance: "Affliction chance ×1.30",
+  AfflictionDamage: "Affliction damage ×1.30",
+  AllDamage: "All damage ×1.15",
+  AttackDuration: "Attack duration +3 seconds",
+  AfflictionDuration: "Affliction duration ×1.50",
+};
+
+export const CURSE_TYPE_LABELS: Record<CurseType, string> = {
+  None: "None",
+  BodyDamage: "Body damage",
+  BurstDamage: "Burst damage",
+  AfflictionDamage: "Affliction damage",
+};
 
 export const isActiveJob = (job: SimulationJob | null | undefined) =>
   Boolean(job && ACTIVE_JOB_STATUSES.has(job.status));
