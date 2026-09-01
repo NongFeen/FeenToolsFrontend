@@ -1,0 +1,23 @@
+.live-widgets-stack {
+  position: fixed;
+  top: 76px;
+  right: 16px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .live-widgets-stack {
+    top: 88px;
+    right: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .live-widgets-stack {
+    top: 126px;
+  }
+}

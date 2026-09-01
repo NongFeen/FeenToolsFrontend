@@ -1,4 +1,5 @@
 import { type PlayerData, formatLabel } from "../dto/CardDefinitionDto";
+import ShorthandNumberInput from "./ShorthandNumberInput";
 
 interface BaseStatBarProps {
   data: PlayerData;
@@ -18,30 +19,22 @@ export default function BaseStatBar({ data, onStatChange }: BaseStatBarProps) {
       <div className="results" style={{ marginBottom: "1rem" }}>
         <div className="result-card">
           <span className="result-label">Raid Level</span>
-          <input
-            type="number"
+          <ShorthandNumberInput
             className="stat-inline-input-large"
             value={data.player_raid_level}
-            onChange={(e) =>
-              onStatChange(
-                "player_raid_level",
-                Math.max(0, parseInt(e.target.value) || 0),
-              )
-            }
+            min={0}
+            integer
+            onValueChange={(value) => onStatChange("player_raid_level", value)}
           />
         </div>
         <div className="result-card">
           <span className="result-label">Base Damage</span>
-          <input
-            type="number"
+          <ShorthandNumberInput
             className="stat-inline-input-large"
             value={data.player_raid_base_damage}
-            onChange={(e) =>
-              onStatChange(
-                "player_raid_base_damage",
-                Math.max(0, parseInt(e.target.value) || 0),
-              )
-            }
+            min={0}
+            integer
+            onValueChange={(value) => onStatChange("player_raid_base_damage", value)}
           />
         </div>
         <div className="result-card">

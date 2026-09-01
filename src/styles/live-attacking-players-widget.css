@@ -1,0 +1,204 @@
+.live-attacking-players-widget {
+  width: 68px;
+  filter: drop-shadow(0 8px 18px rgba(35, 31, 25, 0.2));
+  transition: width var(--transition);
+}
+
+.live-attacking-players-widget.is-open {
+  width: clamp(240px, 22vw, 340px);
+}
+
+.live-attacking-players-button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid rgba(43, 39, 33, 0.28);
+  border-radius: 10px;
+  text-align: left;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+}
+
+.live-attacking-players-widget.is-pinned .live-attacking-players-button {
+  border-color: rgba(196, 87, 42, 0.62);
+}
+
+.live-attacking-players-heading {
+  width: 100%;
+  min-height: 32px;
+  padding: 0.55rem 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid rgba(43, 39, 33, 0.14);
+}
+
+.live-attacking-players-heading strong {
+  font:
+    1rem/1.15 "DM Serif Display",
+    serif;
+}
+
+.live-attacking-players-heading-right {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.live-attacking-players-pin {
+  color: var(--accent);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.live-attacking-players-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 68px;
+  color: var(--text);
+  font:
+    700 1.4rem/1 "DM Serif Display",
+    serif;
+}
+
+.live-attacking-players-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  overflow-y: auto;
+  /* Reserves the scrollbar's space always, whether or not it's currently
+     needed -- otherwise rows shrinking below the scroll threshold reclaim
+     that width right as they're fading out, and it visibly animates. */
+  scrollbar-gutter: stable;
+}
+
+.live-attacking-players-status {
+  padding: 0.55rem 0.65rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.live-attacking-players-status.is-error {
+  color: #8e321f;
+  background: #fff0ee;
+}
+
+/* Framer Motion drives height/opacity/borderBottomColor (outer) and scaleY
+   (inner) directly via its own animation engine -- no CSS `transition`
+   needed here (and none should be added: a CSS transition racing Motion's
+   own per-frame style updates on the same properties would just fight it). */
+.live-attacking-players-entry {
+  overflow: hidden;
+  border-bottom: 1px solid rgba(43, 39, 33, 0.1);
+}
+
+.live-attacking-players-entry:last-child {
+  border-bottom: none;
+}
+
+.live-attacking-players-entry-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.live-attacking-players-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.live-attacking-players-name {
+  overflow: hidden;
+  min-width: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-attacking-players-cards {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.3rem;
+}
+
+.live-attacking-players-card {
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(43, 39, 33, 0.25);
+  border-radius: 5px;
+  background: #eee;
+}
+
+.live-attacking-players-card img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.live-attacking-players-card-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 0.5rem;
+  text-align: center;
+}
+
+.live-attacking-players-timer {
+  position: relative;
+  width: 100%;
+  height: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(43, 39, 33, 0.28);
+  border-radius: 4px;
+  background: rgba(208, 205, 199, 0.6);
+}
+
+.live-attacking-players-timer-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: #9edcff;
+  transition: width 0.2s linear;
+}
+
+.live-attacking-players-timer.is-ending-soon
+  .live-attacking-players-timer-fill {
+  background: #ff9b8a;
+}
+
+.live-attacking-players-timer-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #111;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+@media (max-width: 640px) {
+  .live-attacking-players-widget.is-open {
+    width: min(300px, calc(100vw - 24px));
+  }
+}

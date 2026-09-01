@@ -1,287 +1,653 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { api, ApiError, assetUrl } from "../api/client";
+import type {
+  CardDefinition,
+  PlayerSummary,
+  RaidCycle,
+  Recommendation,
+} from "../api/types";
 import Navbar from "../components/Navbar";
-import BaseStatBar from "../components/BaseStatBar";
-import GroupedStatSectionPanel from "../components/GroupedStatPanel";
-import CardGrid from "../components/CardGrid";
-import BossSettingPanel from "../components/BossSettingPanel";
-import {
-  type PlayerData,
-  TITAN_SOUL_GROUPS,
-  CARD_AND_GEM_GROUPS,
-  type CardDefinitionDto,
-} from "../dto/CardDefinitionDto";
+import RaidResetCountdown from "../components/RaidResetCountdown";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+interface DeckPreview {
+  loading: boolean;
+  recommendation?: Recommendation;
+  cardLevels?: Record<string, number>;
+  error?: string;
+}
+
+interface PlayerRecommendationModes {
+  current: Recommendation | null;
+  combined: Recommendation | null;
+  currentError?: string;
+  combinedError?: string;
+}
+
+interface PreviewLayout {
+  placement: "above" | "below";
+  maxHeight: number;
+}
+
+const loadRecommendationOrNull = async (
+  playerId: string,
+  includeBodyPhase: boolean,
+) => {
+  try {
+    const recommendation = await api.recommendation(
+      playerId,
+      6,
+      true,
+      true,
+      includeBodyPhase,
+    );
+    return includeBodyPhase && !recommendation.body_phase_ran
+      ? null
+      : recommendation;
+  } catch (reason) {
+    if (reason instanceof ApiError && reason.status === 404) return null;
+    throw reason;
+  }
+};
+
+const summarizeRecommendations = (
+  players: PlayerSummary[],
+  recommendations: Record<string, PlayerRecommendationModes>,
+  mode: "current" | "combined",
+) => {
+  const available = players.flatMap((player) => {
+    const recommendation = recommendations[player.player_id]?.[mode];
+    return recommendation ? [recommendation] : [];
+  });
+  const totalDamage = available.reduce(
+    (total, recommendation) =>
+      total + BigInt(recommendation.total_average_damage.split(".")[0]),
+    0n,
+  );
+  const totalDecks = available.reduce(
+    (total, recommendation) => total + recommendation.decks.length,
+    0,
+  );
+  return {
+    totalDamage: totalDamage.toString(),
+    averagePerDeck:
+      totalDecks === 0 ? "0" : (totalDamage / BigInt(totalDecks)).toString(),
+    playersCalculated: available.length,
+    totalDecks,
+    checksFailed: players.filter((player) =>
+      mode === "current"
+        ? Boolean(recommendations[player.player_id]?.currentError)
+        : Boolean(recommendations[player.player_id]?.combinedError),
+    ).length,
+  };
+};
+
+const readableCardName = (cardId: string) =>
+  cardId.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+const normalizeCardKey = (cardId: string) =>
+  cardId.toLocaleLowerCase().replace(/[^a-z0-9]/g, "");
+const clampPercent = (value: number, maximum: number) =>
+  Number.isFinite(value) ? Math.min(maximum, Math.max(0, value)) : 0;
+const formatDamage = (value: string, multiplier = 1) => {
+  try {
+    const wholeDamage = BigInt(value.split(".")[0]);
+    const scale = 1_000_000n;
+    const scaledMultiplier = BigInt(Math.round(multiplier * Number(scale)));
+    return ((wholeDamage * scaledMultiplier) / scale).toLocaleString();
+  } catch {
+    return value;
+  }
+};
+const formatCompactDamage = (
+  value: string | number | undefined,
+  multiplier = 1,
+) => {
+  if (value === undefined) return "—";
+  const damage = Number(value) * multiplier;
+  if (!Number.isFinite(damage)) return String(value);
+  return new Intl.NumberFormat("en", {
+    notation: "compact",
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  }).format(damage);
+};
 
 export default function TapTitan() {
-  const [rawInput, setRawInput] = useState("");
-  const [cardDefinitions, setCardDefinitions] = useState<CardDefinitionDto[]>(
-    [],
-  );
-  const [playerData, setPlayerData] = useState<PlayerData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [players, setPlayers] = useState<PlayerSummary[]>([]);
+  const [cards, setCards] = useState<CardDefinition[]>([]);
+  const [search, setSearch] = useState("");
+  const [moralePercent, setMoralePercent] = useState(0);
+  const [raidCycle, setRaidCycle] = useState<RaidCycle | null>(null);
+  const [raidCycleLoading, setRaidCycleLoading] = useState(true);
+  const [loyaltyPercent, setLoyaltyPercent] = useState(34);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [hoveredPlayerId, setHoveredPlayerId] = useState("");
+  const [previewLayout, setPreviewLayout] = useState<PreviewLayout>({
+    placement: "below",
+    maxHeight: 480,
+  });
+  const [deckPreviews, setDeckPreviews] = useState<Record<string, DeckPreview>>(
+    {},
+  );
+  const [clanRecommendations, setClanRecommendations] = useState<
+    Record<string, PlayerRecommendationModes>
+  >({});
+  const [clanRecommendationsLoading, setClanRecommendationsLoading] =
+    useState(true);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewRequestsRef = useRef(new Set<string>());
+  const raidCycleRequestRef = useRef<Promise<RaidCycle> | null>(null);
+  const moraleManuallyEditedRef = useRef(false);
+  const damageMultiplier =
+    (1 + moralePercent / 100) * (1 + loyaltyPercent / 100);
+
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const filteredPlayers = normalizedSearch
+    ? players.filter((player) =>
+        `${player.display_name} ${player.player_id}`
+          .toLocaleLowerCase()
+          .includes(normalizedSearch),
+      )
+    : players;
 
   useEffect(() => {
-    async function loadDefinitions() {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/taptitan/cards`);
-        if (!res.ok) throw new Error("Failed to load cards metadata");
-        const data: CardDefinitionDto[] = await res.json();
-        setCardDefinitions(data);
-
-        setPlayerData({
-          player_raid_level: 0,
-          player_raid_base_damage: 0,
-          raid_set: {
-            jade_anniversary: false,
-            jukk_juggernaut: false,
-            airforce_ace: false,
-            dancer_venom: false,
-            rose_anniversary: false,
-          },
-          titan_soul_research: Object.fromEntries(
-            TITAN_SOUL_GROUPS.flatMap((g) => g.keys).map((k) => [k, 0]),
-          ),
-          raid_card_research: Object.fromEntries(
-            CARD_AND_GEM_GROUPS.flatMap((g) => g.keys).map((k) => [k, 0]),
-          ),
-          gem_stone_research: Object.fromEntries(
-            CARD_AND_GEM_GROUPS.flatMap((g) => g.keys).map((k) => [k, 0]),
-          ),
-          card_list: data.map((c) => ({
-            card_id: c.id,
-            cardtype: c.type,
-            level: 0,
-          })),
-        });
-      } catch (err) {
-        console.error("[ERROR] Baseline framework build failed:", err);
-      }
-    }
-    loadDefinitions();
+    let active = true;
+    api
+      .players()
+      .then(async (data) => {
+        if (!active) return;
+        setPlayers(data);
+        const loaded = await Promise.all(
+          data.map(async (player) => {
+            const [currentResult, combinedResult] = await Promise.allSettled([
+              loadRecommendationOrNull(player.player_id, false),
+              loadRecommendationOrNull(player.player_id, true),
+            ]);
+            return [
+              player.player_id,
+              {
+                current:
+                  currentResult.status === "fulfilled"
+                    ? currentResult.value
+                    : null,
+                combined:
+                  combinedResult.status === "fulfilled"
+                    ? combinedResult.value
+                    : null,
+                currentError:
+                  currentResult.status === "rejected"
+                    ? currentResult.reason instanceof ApiError
+                      ? currentResult.reason.message
+                      : "Could not load current recommendation."
+                    : undefined,
+                combinedError:
+                  combinedResult.status === "rejected"
+                    ? combinedResult.reason instanceof ApiError
+                      ? combinedResult.reason.message
+                      : "Could not load Body/Void recommendation."
+                    : undefined,
+              },
+            ] as const;
+          }),
+        );
+        if (active) setClanRecommendations(Object.fromEntries(loaded));
+      })
+      .catch((reason) => {
+        if (active)
+          setError(
+            reason instanceof ApiError
+              ? reason.message
+              : "Failed to load players.",
+          );
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+          setClanRecommendationsLoading(false);
+        }
+      });
+    api
+      .cards()
+      .then((data) => {
+        if (active) setCards(data);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const scrollToSection = (id: string) =>
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-
-  const handleSubmit = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const parsed = JSON.parse(rawInput);
-      const res = await fetch(`${API_BASE_URL}/api/taptitan/player_data`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed),
+  useEffect(() => {
+    let active = true;
+    raidCycleRequestRef.current ??= api.currentRaidCycle();
+    raidCycleRequestRef.current
+      .then((cycle) => {
+        if (!active) return;
+        setRaidCycle(cycle);
+        if (!moraleManuallyEditedRef.current) {
+          setMoralePercent(
+            Math.min(100, Math.max(0, cycle.default_morale_percent)),
+          );
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setRaidCycleLoading(false);
       });
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    return () => {
+      active = false;
+    };
+  }, []);
 
-      const json = await res.json();
-      if (json?.data?.data) {
-        setPlayerData(json.data.data as PlayerData);
-      } else {
-        throw new Error("Unexpected response envelope from server");
+  const currentSummary = summarizeRecommendations(
+    players,
+    clanRecommendations,
+    "current",
+  );
+  const combinedSummary = summarizeRecommendations(
+    players,
+    clanRecommendations,
+    "combined",
+  );
+
+  const cardDefinitions = new Map(
+    cards.map((card) => [normalizeCardKey(card.id), card] as const),
+  );
+
+  useEffect(
+    () => () => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    },
+    [],
+  );
+
+  const loadDeckPreview = (player: PlayerSummary) => {
+    if (
+      previewRequestsRef.current.has(player.player_id) ||
+      deckPreviews[player.player_id]?.recommendation ||
+      deckPreviews[player.player_id]?.loading
+    )
+      return;
+    previewRequestsRef.current.add(player.player_id);
+    setDeckPreviews((current) => ({
+      ...current,
+      [player.player_id]: { loading: true },
+    }));
+    const loadedModes = clanRecommendations[player.player_id];
+    const recommendationPromise = loadedModes
+      ? Promise.resolve(loadedModes.combined ?? loadedModes.current)
+      : loadRecommendationOrNull(player.player_id, true).then(
+          (combined) =>
+            combined ?? loadRecommendationOrNull(player.player_id, false),
+        );
+    Promise.all([
+      recommendationPromise,
+      api.player(player.player_id).catch(() => null),
+    ])
+      .then(([recommendation, detail]) =>
+        setDeckPreviews((current) => ({
+          ...current,
+          [player.player_id]: recommendation
+            ? {
+                loading: false,
+                recommendation,
+                cardLevels: Object.fromEntries(
+                  (detail?.stats?.card_list ?? []).map((card) => [
+                    normalizeCardKey(card.card_id),
+                    card.level,
+                  ]),
+                ),
+              }
+            : {
+                loading: false,
+                error: "No six-deck recommendation is ready.",
+              },
+        })),
+      )
+      .catch((reason) =>
+        setDeckPreviews((current) => ({
+          ...current,
+          [player.player_id]: {
+            loading: false,
+            error:
+              reason instanceof ApiError && reason.status === 404
+                ? "No six-deck recommendation is ready."
+                : reason instanceof ApiError
+                  ? reason.message
+                  : "Could not load deck preview.",
+          },
+        })),
+      );
+  };
+
+  const playersInPreviewRange = (
+    player: PlayerSummary,
+    anchor: HTMLElement,
+  ) => {
+    const grid = anchor.parentElement;
+    const currentIndex = filteredPlayers.findIndex(
+      (candidate) => candidate.player_id === player.player_id,
+    );
+    if (!grid || currentIndex < 0) return [player];
+    const templateColumns = window.getComputedStyle(grid).gridTemplateColumns;
+    const columnCount = Math.max(
+      1,
+      templateColumns.trim().split(/\s+/).filter(Boolean).length,
+    );
+    const currentRow = Math.floor(currentIndex / columnCount);
+    const currentColumn = currentIndex % columnCount;
+    const nearby = new Set<number>();
+    for (let rowOffset = -2; rowOffset <= 2; rowOffset += 1) {
+      for (let columnOffset = -2; columnOffset <= 2; columnOffset += 1) {
+        const row = currentRow + rowOffset;
+        const column = currentColumn + columnOffset;
+        if (row < 0 || column < 0 || column >= columnCount) continue;
+        const index = row * columnCount + column;
+        if (index < filteredPlayers.length) nearby.add(index);
       }
-      scrollToSection("section-multipliers");
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Something went wrong.");
-    } finally {
-      setLoading(false);
     }
+    return [...nearby].map((index) => filteredPlayers[index]);
+  };
+
+  const beginDeckPreview = (player: PlayerSummary, anchor: HTMLElement) => {
+    const bounds = anchor.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - bounds.bottom - 8;
+    const spaceAbove = bounds.top - 8;
+    const placement = spaceBelow >= spaceAbove ? "below" : "above";
+    setPreviewLayout({
+      placement,
+      maxHeight: Math.max(
+        0,
+        Math.floor(placement === "below" ? spaceBelow : spaceAbove),
+      ),
+    });
+    setHoveredPlayerId(player.player_id);
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+
+    previewTimerRef.current = setTimeout(() => {
+      playersInPreviewRange(player, anchor).forEach(loadDeckPreview);
+    }, 300);
+  };
+
+  const endDeckPreview = () => {
+    setHoveredPlayerId("");
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = null;
   };
 
   return (
     <div className="page">
       <Navbar />
-
-      <div className="layout">
-        <aside className="sidebar">
-          <p className="sidebar-label">Tools</p>
-          <button
-            className="side-btn"
-            onClick={() => scrollToSection("section-import")}
-          >
-            <span>📥</span> Import Data
-          </button>
-          <p className="sidebar-label">Boss Setting</p>
-          <button
-            className="side-btn"
-            // onClick={() => scrollToSection("section-multipliers")}
-            onClick={() => scrollToSection("section-boss")}
-          >
-            <span>📊</span> Boss
-          </button>
-          <p className="sidebar-label" style={{ marginTop: "1rem" }}>
-            Dashboard Index
-          </p>
-          <button
-            className="side-btn"
-            onClick={() => scrollToSection("section-multipliers")}
-          >
-            <span>📊</span> Multipliers
-          </button>
-          <button
-            className="side-btn"
-            onClick={() => scrollToSection("section-titan-soul")}
-          >
-            <span>🧬</span> Titan Soul
-          </button>
-          <button
-            className="side-btn"
-            onClick={() => scrollToSection("section-raid-card")}
-          >
-            <span>🃏</span> Raid Card
-          </button>
-          <button
-            className="side-btn"
-            onClick={() => scrollToSection("section-gem-stone")}
-          >
-            <span>💎</span> Gem Stone
-          </button>
-          <button
-            className="side-btn"
-            onClick={() => scrollToSection("section-card-vault")}
-          >
-            <span>📦</span> Card Vault
-          </button>
-        </aside>
-
-        <main className="content">
-          <section id="section-import" className="panel scroll-target">
-            <h2 className="panel-title">Import Player Data</h2>
-            <p className="panel-desc">
-              Paste raw TapTitan 2 player profile export JSON code below.
-            </p>
-            <textarea
-              className="code-area"
-              rows={10}
-              placeholder={
-                '{\n  "playerStats": { ... },\n  "raidCards": { ... }\n}'
-              }
-              value={rawInput}
-              onChange={(e) => setRawInput(e.target.value)}
-              spellCheck={false}
-            />
-            {error && <div className="error-box">{error}</div>}
-            <button
-              className="calc-btn"
-              onClick={handleSubmit}
-              disabled={loading || !rawInput.trim()}
-              style={{ marginTop: "1rem" }}
-            >
-              {loading ? "Processing Data…" : "Parse & Clean Input →"}
-            </button>
-          </section>
-
-          <div id="section-dashboard" style={{ marginTop: "2rem" }}>
-            {!playerData ? (
-              <div className="panel">
-                <p
-                  style={{
-                    color: "var(--text-muted)",
-                    fontSize: "0.875rem",
-                    margin: 0,
+      <main className="page-shell">
+        <div className="page-header">
+          <span className="eyebrow">Tap Titans 2</span>
+          <h1>Kero Clan deck recommendations</h1>
+        </div>
+        <section
+          className="clan-recommendation-summary"
+          aria-label="Clan recommendation totals"
+        >
+          <div className="clan-damage-modifier-row">
+            <strong>Damage modifiers</strong>
+            <div className="damage-modifier-controls">
+              <label className="damage-percent-control">
+                <span>Morale %</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={moralePercent}
+                  onChange={(event) => {
+                    moraleManuallyEditedRef.current = true;
+                    setMoralePercent(
+                      clampPercent(event.currentTarget.valueAsNumber, 100),
+                    );
                   }}
-                >
-                  Constructing baseline stats dashboard framework...
-                </p>
-              </div>
-            ) : (
-              <>
-                <BossSettingPanel />
-
-                <div id="section-multipliers" className="panel scroll-target">
-                  <h2 className="panel-title">Account Base Multipliers</h2>
-                  <p className="panel-desc">
-                    Tweak fundamental raid performance scalars.
-                  </p>
-                  <BaseStatBar
-                    data={playerData}
-                    onStatChange={(k, v) =>
-                      setPlayerData({ ...playerData, [k]: v })
-                    }
-                  />
-                </div>
-
-                <GroupedStatSectionPanel
-                  id="section-titan-soul"
-                  title="Titan Soul Research"
-                  description="Anatomical location and Titan Lord target multipliers (Percentages)."
-                  stats={playerData.titan_soul_research}
-                  structureGroups={TITAN_SOUL_GROUPS}
-                  isPercentage={true}
-                  onChange={(k, v) =>
-                    setPlayerData({
-                      ...playerData,
-                      titan_soul_research: {
-                        ...playerData.titan_soul_research,
-                        [k]: v,
-                      },
-                    })
+                />
+              </label>
+              <label className="damage-percent-control">
+                <span>Loyalty %</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={34}
+                  step={1}
+                  value={loyaltyPercent}
+                  onChange={(event) =>
+                    setLoyaltyPercent(
+                      clampPercent(event.currentTarget.valueAsNumber, 34),
+                    )
                   }
                 />
-                <GroupedStatSectionPanel
-                  id="section-raid-card"
-                  title="Raid Card Research Bonus"
-                  description="Flat card capability level tracking milestones separated by scaling categories."
-                  stats={playerData.raid_card_research}
-                  structureGroups={CARD_AND_GEM_GROUPS}
-                  onChange={(k, v) =>
-                    setPlayerData({
-                      ...playerData,
-                      raid_card_research: {
-                        ...playerData.raid_card_research,
-                        [k]: v,
-                      },
-                    })
-                  }
-                />
-
-                <GroupedStatSectionPanel
-                  id="section-gem-stone"
-                  title="Gem Stone Research Bonus"
-                  description="Flat talent stone alignment progression attributes separated by scaling categories."
-                  stats={playerData.gem_stone_research}
-                  structureGroups={CARD_AND_GEM_GROUPS}
-                  onChange={(k, v) =>
-                    setPlayerData({
-                      ...playerData,
-                      gem_stone_research: {
-                        ...playerData.gem_stone_research,
-                        [k]: v,
-                      },
-                    })
-                  }
-                />
-
-                <div
-                  id="section-card-vault"
-                  className="panel scroll-target"
-                  style={{ marginTop: "1.5rem" }}
-                >
-                  <h2 className="panel-title">Card Vault Deck</h2>
-                  <p className="panel-desc">
-                    Active level configuration values per deck piece.
-                  </p>
-                  <CardGrid
-                    cards={playerData.card_list}
-                    cardDefinitions={cardDefinitions}
-                    onCardLevelChange={(id, lvl) =>
-                      setPlayerData({
-                        ...playerData,
-                        card_list: playerData.card_list.map((c) =>
-                          c.card_id === id ? { ...c, level: lvl } : c,
-                        ),
-                      })
-                    }
-                  />
-                </div>
-              </>
-            )}
+              </label>
+            </div>
           </div>
-        </main>
-      </div>
+          {clanRecommendationsLoading && (
+            <p>Fetching recommendations for all listed players…</p>
+          )}
+          {!clanRecommendationsLoading && (
+            <>
+              <div className="clan-summary-mode">
+                <h2>Current boss only</h2>
+                <span>Combined average damage</span>
+                <strong>
+                  {formatCompactDamage(
+                    currentSummary.totalDamage,
+                    damageMultiplier,
+                  )}
+                </strong>
+                <span>Average damage per deck</span>
+                <strong>
+                  {formatCompactDamage(
+                    currentSummary.averagePerDeck,
+                    damageMultiplier,
+                  )}
+                </strong>
+                <small>
+                  {currentSummary.playersCalculated} / {players.length} players
+                  · {currentSummary.totalDecks} decks calculated
+                  {currentSummary.checksFailed > 0
+                    ? ` · ${currentSummary.checksFailed} checks failed`
+                    : ""}
+                </small>
+              </div>
+              <div className="clan-summary-mode body">
+                <h2>Current + Void </h2>
+                <span>Combined average damage</span>
+                <strong>
+                  {formatCompactDamage(
+                    combinedSummary.totalDamage,
+                    damageMultiplier,
+                  )}
+                </strong>
+                <span>Average damage per deck</span>
+                <strong>
+                  {formatCompactDamage(
+                    combinedSummary.averagePerDeck,
+                    damageMultiplier,
+                  )}
+                </strong>
+                <small>
+                  {combinedSummary.playersCalculated} / {players.length} players{" "}
+                  {combinedSummary.checksFailed > 0
+                    ? ` · ${combinedSummary.checksFailed} checks failed`
+                    : ""}
+                </small>
+              </div>
+              <RaidResetCountdown
+                cycle={raidCycle}
+                loading={raidCycleLoading}
+              />
+            </>
+          )}
+        </section>
+        {loading && <div className="panel empty-state">Loading players…</div>}
+        {!loading && error && (
+          <div className="error-box standalone-error">{error}</div>
+        )}
+        {!loading && !error && players.length === 0 && (
+          <div className="panel empty-state">
+            <h2>No players yet</h2>
+            <p>Clan player data has not been loaded yet. Check back soon.</p>
+          </div>
+        )}
+        {!loading && !error && players.length > 0 && (
+          <label className="player-search">
+            <input
+              type="search"
+              aria-label="Search players"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search players…"
+            />
+          </label>
+        )}
+        <div className="player-grid">
+          {filteredPlayers.map((player) => (
+            <Link
+              className="player-option"
+              key={player.player_id}
+              to={`/tools/taptitan/players/${encodeURIComponent(player.player_id)}`}
+              onMouseEnter={(event) =>
+                beginDeckPreview(player, event.currentTarget)
+              }
+              onMouseLeave={endDeckPreview}
+              onFocus={(event) => beginDeckPreview(player, event.currentTarget)}
+              onBlur={endDeckPreview}
+            >
+              <div>
+                <h2>{player.display_name}</h2>
+                <p>{player.player_id}</p>
+              </div>
+              <span className="arrow" aria-hidden="true">
+                →
+              </span>
+              {hoveredPlayerId === player.player_id && (
+                <div
+                  className={`player-deck-preview ${previewLayout.placement}`}
+                  role="status"
+                  style={{ maxHeight: previewLayout.maxHeight }}
+                >
+                  <strong>Best 6 decks</strong>
+                  <small>Mirror Force + Team Tactics</small>
+                  {!deckPreviews[player.player_id] && <p>Loading preview…</p>}
+                  {deckPreviews[player.player_id]?.loading && (
+                    <p>Loading preview…</p>
+                  )}
+                  {deckPreviews[player.player_id]?.error && (
+                    <p>{deckPreviews[player.player_id].error}</p>
+                  )}
+                  {deckPreviews[player.player_id]?.recommendation && (
+                    <>
+                      <small className="preview-total-damage">
+                        Total avg dmg:{" "}
+                        {formatDamage(
+                          deckPreviews[player.player_id]!.recommendation!
+                            .total_average_damage,
+                          damageMultiplier,
+                        )}
+                      </small>
+                      <ol>
+                        {[
+                          ...deckPreviews[player.player_id]!.recommendation!
+                            .decks,
+                        ]
+                          .sort((left, right) => left.position - right.position)
+                          .slice(0, 6)
+                          .map((deck, index) => {
+                            const cards = deck.cards?.length
+                              ? deck.cards
+                              : (deck.result?.deck ?? []);
+                            return (
+                              <li key={`${deck.position}-${index}`}>
+                                <span className="preview-deck-cards">
+                                  {cards.slice(0, 3).map((cardId) => {
+                                    const definition = cardDefinitions.get(
+                                      normalizeCardKey(cardId),
+                                    );
+                                    const cardName =
+                                      definition?.name ??
+                                      readableCardName(cardId);
+                                    const level =
+                                      deckPreviews[player.player_id]
+                                        ?.cardLevels?.[
+                                        normalizeCardKey(cardId)
+                                      ];
+                                    const cardDamage =
+                                      deck.result?.best_pattern?.card_damage?.find(
+                                        (entry) =>
+                                          normalizeCardKey(entry.card) ===
+                                          normalizeCardKey(cardId),
+                                      );
+                                    return (
+                                      <span
+                                        className="preview-card-slot"
+                                        key={cardId}
+                                      >
+                                        <span className="preview-card-image">
+                                          {definition?.image ? (
+                                            <img
+                                              src={assetUrl(definition.image)}
+                                              alt={cardName}
+                                              title={cardName}
+                                            />
+                                          ) : (
+                                            <span
+                                              role="img"
+                                              aria-label={`${cardName} image unavailable`}
+                                            >
+                                              ?
+                                            </span>
+                                          )}
+                                          {level !== undefined && (
+                                            <small className="card-level-badge">
+                                              Lv {level}
+                                              {Boolean(
+                                                definition?.seasonal_level_boost,
+                                              ) && (
+                                                <span className="seasonal-level-inline">
+                                                  +
+                                                  {
+                                                    definition!
+                                                      .seasonal_level_boost
+                                                  }
+                                                </span>
+                                              )}
+                                            </small>
+                                          )}
+                                        </span>
+                                        <small className="card-damage-label">
+                                          {formatCompactDamage(
+                                            cardDamage?.average_damage,
+                                            damageMultiplier,
+                                          )}
+                                        </small>
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              </li>
+                            );
+                          })}
+                      </ol>
+                    </>
+                  )}
+                </div>
+              )}
+            </Link>
+          ))}
+        </div>
+        {!loading &&
+          !error &&
+          players.length > 0 &&
+          filteredPlayers.length === 0 && (
+            <div className="empty-state compact-empty">
+              No players match your search.
+            </div>
+          )}
+      </main>
     </div>
   );
 }
