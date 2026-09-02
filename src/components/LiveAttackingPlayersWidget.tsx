@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FocusEvent, KeyboardEvent, MouseEvent } from "react";
+import type { FocusEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useLocation } from "react-router-dom";
 import { assetUrl, api } from "../api/client";
@@ -261,29 +261,6 @@ export default function LiveAttackingPlayersWidget() {
     setPlayers((prev) => mergeIncoming(prev, incoming, now));
   }, []);
 
-  // DEBUG ONLY -- remove this and the control that calls it once the
-  // animation is confirmed good. Injects a fake attacker through the exact
-  // same path a real "player" SSE event takes, so it exercises the real
-  // merge/animation logic without needing a live TT2 attack. A short 2s
-  // duration means it dims almost immediately, so the only real wait is
-  // HOLD_AFTER_EXPIRY_SECONDS before it's removed.
-  const addDebugPlayer = useCallback(() => {
-    const suffix = Math.random().toString(36).slice(2, 7);
-    applyIncoming([
-      {
-        player_code: `debug-${suffix}`,
-        name: `Debug Player ${suffix}`,
-        cards: [
-          { card_id: "debug1", display_name: "Debug Card 1", image_url: "" },
-          { card_id: "debug2", display_name: "Debug Card 2", image_url: "" },
-          { card_id: "debug3", display_name: "Debug Card 3", image_url: "" },
-        ],
-        started_at: new Date().toISOString(),
-        duration_seconds: 2,
-      },
-    ]);
-  }, [applyIncoming]);
-
   // The backend pushes updates over SSE (a "snapshot" event right when the
   // connection opens, then a "player" event for each new attack as it
   // starts) instead of the widget having to poll for them. EventSource
@@ -386,22 +363,6 @@ export default function LiveAttackingPlayersWidget() {
     }
   };
 
-  // DEBUG ONLY. A <span role="button"> rather than a real <button> --
-  // it's rendered inside live-attacking-players-heading, which lives inside
-  // the widget's own outer <button>, and a <button> can't validly nest
-  // inside another <button>. stopPropagation keeps its click from also
-  // bubbling up to the outer button's pin-toggle handler.
-  const handleDebugClick = (event: MouseEvent) => {
-    event.stopPropagation();
-    addDebugPlayer();
-  };
-  const handleDebugKeyDown = (event: KeyboardEvent<HTMLSpanElement>) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    event.stopPropagation();
-    addDebugPlayer();
-  };
-
   return (
     <aside
       className={`live-attacking-players-widget${isOpen ? " is-open" : ""}${pinned ? " is-pinned" : ""}`}
@@ -429,17 +390,6 @@ export default function LiveAttackingPlayersWidget() {
           <span className="live-attacking-players-heading">
             <strong>Attacking Now</strong>
             <span className="live-attacking-players-heading-right">
-              {import.meta.env.DEV && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className="live-attacking-players-debug"
-                  onClick={handleDebugClick}
-                  onKeyDown={handleDebugKeyDown}
-                >
-                  + Debug
-                </span>
-              )}
               <span className="live-attacking-players-pin" aria-hidden="true">
                 {pinned ? "Pinned" : "Click to pin"}
               </span>
