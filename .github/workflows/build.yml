@@ -1,17 +1,17 @@
 name: Build static site
 
-# Runs on every push to dev-to-p (your promotion branch -- see repo history:
-# feature branches merge into dev, dev merges into dev-to-p when ready to
-# ship). Builds the static site, deploys it live to GitHub Pages, uploads a
-# plain 14-day workflow artifact, and separately builds+pushes the nginx
-# Docker image (frontend/Dockerfile) to ghcr.io -- same registry/pattern as
-# the backend repo's images, as a persistent versioned record and an
-# alternate way to run this outside Pages if you ever need to. Requires one
-# manual repo setting: Settings -> Pages -> Source: GitHub Actions
-# (one-time, can't be set from this file).
+# Runs on every push to master -- your actual deployed branch (feature
+# branches merge into dev, dev merges into dev-to-p to stage, dev-to-p
+# merges into master to ship). Builds the static site, deploys it live to
+# GitHub Pages, uploads a plain 14-day workflow artifact, and separately
+# builds+pushes the nginx Docker image (frontend/Dockerfile) to ghcr.io --
+# same registry/pattern as the backend repo's images, as a persistent
+# versioned record and an alternate way to run this outside Pages if you
+# ever need to. Requires one manual repo setting: Settings -> Pages ->
+# Source: GitHub Actions (one-time, can't be set from this file).
 on:
   push:
-    branches: [dev-to-p]
+    branches: [master]
   workflow_dispatch: {}
 
 permissions:
