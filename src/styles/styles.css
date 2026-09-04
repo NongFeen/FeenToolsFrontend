@@ -878,6 +878,93 @@ button:disabled {
   margin-bottom: 0;
 }
 
+.attack-log-section + .attack-log-section {
+  margin-top: 1.5rem;
+}
+.attack-log-subtitle {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+}
+.attack-log-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.attack-log-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.attack-log-deck-images {
+  flex: 0 0 auto;
+  grid-template-columns: repeat(3, 40px);
+}
+.attack-log-tap-only {
+  flex: 0 0 auto;
+  min-width: 120px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+.attack-log-row-metrics {
+  flex: 1;
+  margin-top: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.attack-log-row-metrics-wide {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+/* Applied to the whole `.attack-log-row`, not just the "vs Sim" number --
+   compounding both classes on the same element (0,2,0 specificity) is
+   already enough to beat `.attack-log-row`'s own `background`/`border`
+   (0,1,0), so no selector-order tricks needed here, unlike the old
+   text-color version of this. */
+.attack-log-row.attack-log-diff-red {
+  background: #fdeceb;
+  border-color: #e2a99e;
+}
+.attack-log-row.attack-log-diff-green {
+  background: var(--success-light);
+  border-color: #bedfca;
+}
+.attack-log-row.attack-log-diff-rainbow {
+  border-color: transparent;
+  background: linear-gradient(
+    90deg,
+    #fbdcd9,
+    #fbe6c9,
+    #f7f3c2,
+    #d7ecda,
+    #cfe6f5,
+    #dcd5f5,
+    #fbdcd9
+  );
+  background-size: 300% 100%;
+  animation: attack-log-rainbow-shift 4s linear infinite;
+}
+@keyframes attack-log-rainbow-shift {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 300% 50%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .attack-log-row.attack-log-diff-rainbow {
+    animation: none;
+    background: #ece6fa;
+    border-color: #cabdea;
+  }
+}
+
 .debug-sim-error {
   margin-bottom: 1rem;
 }
