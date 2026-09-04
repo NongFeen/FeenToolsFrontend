@@ -1,4 +1,4 @@
-name: Build static site
+name: build and creat package
 
 # Runs on every push to master -- your actual deployed branch (feature
 # branches merge into dev, dev merges into dev-to-p to stage, dev-to-p
