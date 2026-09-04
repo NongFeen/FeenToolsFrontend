@@ -1,0 +1,70 @@
+name: Build static site
+
+# Runs on every push to dev-to-p (your promotion branch -- see repo history:
+# feature branches merge into dev, dev merges into dev-to-p when ready to
+# ship), and publishes the built dist/ to GitHub Packages (npm registry) so
+# it's visible under the repo's Packages tab, not just a 14-day workflow
+# artifact. Wire in an actual static-host deploy step once you've picked one.
+on:
+  push:
+    branches: [dev-to-p]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+
+      - run: npm ci
+
+      # Vite inlines VITE_* variables into the JS bundle at build time, so
+      # this has to be set as a build-time env var, not read at runtime.
+      # Set the actual backend URL in: repo Settings -> Secrets and
+      # variables -> Actions -> Variables -> VITE_API_BASE_URL. Left empty
+      # by default (same-origin), matching Dockerfile.combined's convention.
+      - run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+      # GitHub Packages needs its own package.json inside the published
+      # directory -- scoped to the repo owner (lowercased: npm package names
+      # must be lowercase even though the GitHub username isn't), versioned
+      # by run number so every push publishes a new version without
+      # colliding. Deliberately never touches the source package.json
+      # (kept private:true/"taptitan-app" for local dev) -- this is a
+      # separate, minimal manifest describing just the built static output.
+      - name: Prepare dist package.json
+        run: |
+          node -e "
+            const fs = require('fs');
+            const owner = '${{ github.repository_owner }}'.toLowerCase();
+            fs.writeFileSync('dist/package.json', JSON.stringify({
+              name: '@' + owner + '/taptitan-frontend',
+              version: '0.0.${{ github.run_number }}',
+              private: false,
+              publishConfig: { registry: 'https://npm.pkg.github.com' },
+            }, null, 2));
+          "
+
+      - name: Publish to GitHub Packages
+        run: npm publish
+        working-directory: dist
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 14
