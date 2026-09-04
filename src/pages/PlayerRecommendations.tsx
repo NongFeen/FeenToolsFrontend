@@ -13,6 +13,7 @@ import AttackLog from "../components/AttackLog";
 import JobStatus from "../components/JobStatus";
 import Navbar from "../components/Navbar";
 import RecommendationDecks from "../components/RecommendationDecks";
+import ReRecommendModal from "../components/ReRecommendModal";
 import { usePolling } from "../hooks/usePolling";
 import { useRaidMoraleDefault } from "../hooks/useRaidMoraleDefault";
 import { isActiveJob } from "../utils/taptitan";
@@ -58,6 +59,11 @@ export default function PlayerRecommendations() {
   const [attackLogError, setAttackLogError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
+  const [rerecommendOpen, setRerecommendOpen] = useState(false);
+  const [rerecommendSubmitting, setRerecommendSubmitting] = useState(false);
+  const [rerecommendError, setRerecommendError] = useState("");
+  const [customRecommendation, setCustomRecommendation] = useState<Recommendation | null>(null);
+  const [customExcludedCount, setCustomExcludedCount] = useState(0);
   const completedJobRef = useRef("");
   const recommendationRequestRef = useRef(0);
   const recommendationsInitializedRef = useRef(false);
@@ -171,6 +177,48 @@ export default function PlayerRecommendations() {
     }
     setRefreshing(false);
   }, [loadRecommendations, playerId]);
+
+  // Kept entirely separate from `recommendations`/`recommendationKey` --
+  // that cache is auto-refreshed by the effect below (`api.recommendation`
+  // then auto-generate on 404), which would otherwise immediately overwrite
+  // a custom exclusion result with a fresh non-custom one the moment
+  // deckCount changed to match it. A custom result is never persisted
+  // server-side either, so there's nothing for that cache to key off of.
+  const handleReRecommend = useCallback(
+    async ({
+      deckCount: chosenDeckCount,
+      excludedCards,
+      mustIncludeMirrorForce: chosenMustIncludeMirrorForce,
+      mustIncludeTeamTactics: chosenMustIncludeTeamTactics,
+    }: {
+      deckCount: number;
+      excludedCards: string[];
+      mustIncludeMirrorForce: boolean;
+      mustIncludeTeamTactics: boolean;
+    }) => {
+      setRerecommendSubmitting(true);
+      setRerecommendError("");
+      try {
+        const recommendation = await api.customRecommendation(
+          playerId,
+          chosenDeckCount,
+          excludedCards,
+          chosenMustIncludeMirrorForce,
+          chosenMustIncludeTeamTactics,
+          includeBodyPhase,
+        );
+        pendingScrollPositionRef.current = window.scrollY;
+        setCustomRecommendation(recommendation);
+        setCustomExcludedCount(excludedCards.length);
+        setRerecommendOpen(false);
+      } catch (error) {
+        setRerecommendError(errorMessage(error, "Could not re-recommend decks."));
+      } finally {
+        setRerecommendSubmitting(false);
+      }
+    },
+    [playerId, includeBodyPhase],
+  );
 
   useLayoutEffect(() => {
     const scrollPosition = pendingScrollPositionRef.current;
@@ -332,11 +380,46 @@ export default function PlayerRecommendations() {
           )}
         </section>
 
+        {customRecommendation && (
+          <section className="panel section-gap recommendations-panel">
+            <div className="panel-heading-row">
+              <div>
+                <h2 className="panel-title">Re-recommended decks</h2>
+                <p className="panel-desc">
+                  {customExcludedCount === 0
+                    ? "Recomputed with every card available."
+                    : `Recomputed excluding ${customExcludedCount} card${customExcludedCount === 1 ? "" : "s"}.`}
+                </p>
+              </div>
+            </div>
+            <RecommendationDecks
+              recommendation={customRecommendation}
+              cards={cards}
+              playerCards={player.stats?.card_list ?? []}
+              loading={false}
+              error=""
+              damageMultiplier={damageMultiplier}
+              moralePercent={moralePercent}
+              loyaltyPercent={loyaltyPercent}
+            />
+          </section>
+        )}
+
         <section className="panel section-gap recommendations-panel">
           <div className="panel-heading-row">
             <div>
               <h2 className="panel-title">Best raid decks</h2>
               <p className="panel-desc">Cards are unique across the optimized lineup.</p>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => {
+                  setRerecommendError("");
+                  setRerecommendOpen(true);
+                }}
+              >
+                Re-recommend…
+              </button>
             </div>
             <div className="recommendation-controls">
               <div className="recommendation-mode-control" role="group" aria-label="Simulation phase recommendation">
@@ -432,13 +515,28 @@ export default function PlayerRecommendations() {
           <AttackLog
             entries={attackLog}
             cards={cards}
-            recommendedDecks={recommendations[recommendationKey]?.decks ?? []}
+            recommendedDecks={(customRecommendation ?? recommendations[recommendationKey])?.decks ?? []}
             damageMultiplier={damageMultiplier}
             loading={attackLogLoading}
             error={attackLogError}
           />
         </section>
       </main>
+
+      {rerecommendOpen && (
+        <ReRecommendModal
+          onClose={() => setRerecommendOpen(false)}
+          onSubmit={handleReRecommend}
+          playerCards={player.stats?.card_list ?? []}
+          cards={cards}
+          deckCountOptions={deckCountOptions}
+          initialDeckCount={deckCount}
+          initialMustIncludeMirrorForce={mustIncludeMirrorForce}
+          initialMustIncludeTeamTactics={mustIncludeTeamTactics}
+          submitting={rerecommendSubmitting}
+          error={rerecommendError}
+        />
+      )}
     </div>
   );
 }
