@@ -10,6 +10,7 @@ import type {
   JobAccepted,
   LiveAttackingPlayer,
   LiveCurrentBoss,
+  PlayerAttackLogEntry,
   PlayerDetail,
   PlayerRaidData,
   PlayerStatsVersion,
@@ -130,6 +131,8 @@ export const api = {
     ),
   playerJobs: (playerId: string) =>
     request<SimulationJob[]>(`${playerPath(playerId)}/simulation-jobs`),
+  playerAttackLog: (playerId: string) =>
+    request<PlayerAttackLogEntry[]>(`${playerPath(playerId)}/attack-log`),
   currentBoss: () => request<CurrentBoss>("/api/current-boss"),
   simsBoss: () => request<CurrentBoss>("/api/current-boss"),
   liveCurrentBoss: () => request<LiveCurrentBoss>("/api/live-current-boss"),

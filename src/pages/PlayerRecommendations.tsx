@@ -4,10 +4,12 @@ import { api, ApiError } from "../api/client";
 import type {
   CardDefinition,
   CurrentBoss,
+  PlayerAttackLogEntry,
   PlayerDetail,
   Recommendation,
   SimulationJob,
 } from "../api/types";
+import AttackLog from "../components/AttackLog";
 import JobStatus from "../components/JobStatus";
 import Navbar from "../components/Navbar";
 import RecommendationDecks from "../components/RecommendationDecks";
@@ -51,6 +53,9 @@ export default function PlayerRecommendations() {
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [bossError, setBossError] = useState("");
+  const [attackLog, setAttackLog] = useState<PlayerAttackLogEntry[]>([]);
+  const [attackLogLoading, setAttackLogLoading] = useState(true);
+  const [attackLogError, setAttackLogError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const completedJobRef = useRef("");
@@ -187,18 +192,26 @@ export default function PlayerRecommendations() {
       generatedDeckCountsRef.current.clear();
       pendingScrollPositionRef.current = null;
       setRecommendationsLoading(true);
+      setAttackLogLoading(true);
+      setAttackLogError("");
     });
-    Promise.allSettled([api.player(playerId), api.simsBoss(), api.cards()]).then(
-      ([playerResult, bossResult, cardsResult]) => {
-        if (!active) return;
-        if (playerResult.status === "fulfilled") setPlayer(playerResult.value);
-        else setPageError(errorMessage(playerResult.reason, "Could not load this player."));
-        if (bossResult.status === "fulfilled") setBoss(bossResult.value);
-        else setBossError(errorMessage(bossResult.reason, "No sims boss data is available."));
-        if (cardsResult.status === "fulfilled") setCards(cardsResult.value);
-        setLoading(false);
-      },
-    );
+    Promise.allSettled([
+      api.player(playerId),
+      api.simsBoss(),
+      api.cards(),
+      api.playerAttackLog(playerId),
+    ]).then(([playerResult, bossResult, cardsResult, attackLogResult]) => {
+      if (!active) return;
+      if (playerResult.status === "fulfilled") setPlayer(playerResult.value);
+      else setPageError(errorMessage(playerResult.reason, "Could not load this player."));
+      if (bossResult.status === "fulfilled") setBoss(bossResult.value);
+      else setBossError(errorMessage(bossResult.reason, "No sims boss data is available."));
+      if (cardsResult.status === "fulfilled") setCards(cardsResult.value);
+      if (attackLogResult.status === "fulfilled") setAttackLog(attackLogResult.value);
+      else setAttackLogError(errorMessage(attackLogResult.reason, "Could not load the attack log."));
+      setLoading(false);
+      setAttackLogLoading(false);
+    });
     return () => {
       active = false;
     };
@@ -228,6 +241,17 @@ export default function PlayerRecommendations() {
       }
     },
     onError: () => setJobsReady(true),
+  });
+
+  usePolling({
+    enabled: Boolean(playerId),
+    intervalMs: 15000,
+    load: () => api.playerAttackLog(playerId),
+    onData: (entries) => {
+      setAttackLog(entries);
+      setAttackLogError("");
+    },
+    onError: (error) => setAttackLogError(errorMessage(error, "Could not refresh the attack log.")),
   });
 
   if (loading) {
@@ -395,6 +419,23 @@ export default function PlayerRecommendations() {
                   ? `No compatible ${deckCount}-deck recommendation containing the selected required cards is available.`
                   : `No compatible ${deckCount}-deck recommendation is available.`
             }
+          />
+        </section>
+
+        <section className="panel section-gap">
+          <div className="panel-heading-row">
+            <div>
+              <h2 className="panel-title">Attack log</h2>
+              <p className="panel-desc">Real attack decks and damage, for comparison against the sim recommendations above.</p>
+            </div>
+          </div>
+          <AttackLog
+            entries={attackLog}
+            cards={cards}
+            recommendedDecks={recommendations[recommendationKey]?.decks ?? []}
+            damageMultiplier={damageMultiplier}
+            loading={attackLogLoading}
+            error={attackLogError}
           />
         </section>
       </main>
