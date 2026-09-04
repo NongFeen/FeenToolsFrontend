@@ -5,6 +5,7 @@ import type {
   HealthResponse,
   LiveAttackingPlayer,
   LiveCurrentBoss,
+  PlayerAttackLogEntry,
   PlayerDetail,
   PlayerRaidData,
   PlayerStatsVersion,
@@ -81,6 +82,8 @@ export const api = {
     }),
   playerJobs: (playerId: string) =>
     request<SimulationJob[]>(`${playerPath(playerId)}/simulation-jobs`),
+  playerAttackLog: (playerId: string) =>
+    request<PlayerAttackLogEntry[]>(`${playerPath(playerId)}/attack-log`),
   currentBoss: () => request<CurrentBoss>("/api/current-boss"),
   simsBoss: () => request<CurrentBoss>("/api/current-boss"),
   liveCurrentBoss: () => request<LiveCurrentBoss>("/api/live-current-boss"),
@@ -104,6 +107,24 @@ export const api = {
       `${playerPath(playerId)}/recommendations`,
       { method: "POST", body: json({ deck_count: deckCount, include_body_phase }) },
     ),
+  customRecommendation: (
+    playerId: string,
+    deckCount: number,
+    excludedCards: string[],
+    mustIncludeMirrorForce = false,
+    mustIncludeTeamTactics = false,
+    includeBodyPhase = false,
+  ) =>
+    request<Recommendation>(`${playerPath(playerId)}/recommendations/custom`, {
+      method: "POST",
+      body: json({
+        deck_count: deckCount,
+        include_body_phase: includeBodyPhase,
+        excluded_cards: excludedCards,
+        must_include_mirror_force: mustIncludeMirrorForce,
+        must_include_team_tactics: mustIncludeTeamTactics,
+      }),
+    }),
   cards: () => request<CardDefinition[]>("/api/taptitan/cards"),
   convertPlayerData: (body: unknown) =>
     request<ConvertedPlayerDataResponse>("/api/taptitan/player_data", {

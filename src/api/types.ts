@@ -27,6 +27,25 @@ export interface PlayerDetail extends PlayerSummary {
   stats: PlayerRaidData | null;
 }
 
+export interface PlayerAttackLogEntry {
+  cycle: number;
+  attack_datetime: string;
+  attacked_titan_index: number;
+  resulting_titan_index: number;
+  enemy_id: string;
+  tap_damage: string;
+  total_damage: string;
+  card1: string | null;
+  card1_level: number | null;
+  card1_damage: string | null;
+  card2: string | null;
+  card2_level: number | null;
+  card2_damage: string | null;
+  card3: string | null;
+  card3_level: number | null;
+  card3_damage: string | null;
+}
+
 export interface CardDefinition {
   id: string;
   name: string;
