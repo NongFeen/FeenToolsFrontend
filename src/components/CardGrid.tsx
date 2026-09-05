@@ -1,4 +1,4 @@
-import { assetUrl } from "../api/client";
+import { assetUrl, cardImagePath } from "../api/client";
 import type { CardEntry, CardDefinitionDto } from "../dto/CardDefinitionDto";
 
 interface CardGridProps {
@@ -17,7 +17,7 @@ export default function CardGrid({ cards, cardDefinitions, onCardLevelChange, on
         return (
           <div key={card.card_id} className={`vault-card${card.enabled === false ? " vault-card-disabled" : ""}`}>
             <div className="vault-card-image-wrap">
-              {def?.image ? <img src={assetUrl(def.image)} alt={`${displayName} raid card`} loading="lazy" /> : <span className="image-placeholder">Image unavailable</span>}
+              {def ? <img src={assetUrl(cardImagePath(card.card_id))} alt={`${displayName} raid card`} loading="lazy" /> : <span className="image-placeholder">Image unavailable</span>}
             </div>
             <div className="vault-card-body">
               <p>{displayName}</p>

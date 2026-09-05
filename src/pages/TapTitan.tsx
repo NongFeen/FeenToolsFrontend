@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, ApiError, assetUrl } from "../api/client";
+import { api, ApiError, assetUrl, cardImagePath } from "../api/client";
 import type {
   CardDefinition,
   PlayerSummary,
@@ -587,9 +587,9 @@ export default function TapTitan() {
                                         key={cardId}
                                       >
                                         <span className="preview-card-image">
-                                          {definition?.image ? (
+                                          {definition ? (
                                             <img
-                                              src={assetUrl(definition.image)}
+                                              src={assetUrl(cardImagePath(cardId))}
                                               alt={cardName}
                                               title={cardName}
                                             />

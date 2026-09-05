@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FocusEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useLocation } from "react-router-dom";
-import { assetUrl, api } from "../api/client";
+import { assetUrl, api, cardImagePath } from "../api/client";
 import "../styles/live-attacking-players-widget.css";
 import type { LiveAttackingPlayer } from "../api/types";
 
@@ -224,17 +224,11 @@ function AttackerRow({
                 className="live-attacking-players-card"
                 key={`${player.player_code}-${index}`}
               >
-                {card.image_url ? (
-                  <img
-                    src={assetUrl(card.image_url)}
-                    alt={card.display_name}
-                    loading="lazy"
-                  />
-                ) : (
-                  <span className="live-attacking-players-card-fallback">
-                    {card.display_name}
-                  </span>
-                )}
+                <img
+                  src={assetUrl(cardImagePath(card.card_id))}
+                  alt={card.display_name}
+                  loading="lazy"
+                />
               </span>
             ))}
           </span>
