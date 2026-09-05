@@ -1,13 +1,8 @@
 import type {
-  BossData,
-  BossPartName,
-  BossUpdateAccepted,
   CardDefinition,
   ConvertedPlayerDataResponse,
   CurrentBoss,
-  DebugSimulationResponse,
   HealthResponse,
-  JobAccepted,
   LiveAttackingPlayer,
   LiveCurrentBoss,
   PlayerAttackLogEntry,
@@ -18,16 +13,10 @@ import type {
   Recommendation,
   RecommendationGenerationResponse,
   RaidCycle,
-  SimulationBatch,
-  SimulationBatchAccepted,
   SimulationJob,
-  Tt2PlayerStatus,
-  Tt2ClanStatus,
-  Tt2ClanFetchResult,
 } from "./types";
 
 const baseUrl = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
-const internalKey = String(import.meta.env.VITE_INTERNAL_API_KEY ?? "");
 
 export class ApiError extends Error {
   readonly status: number;
@@ -48,19 +37,9 @@ export class ApiError extends Error {
 async function request<T>(
   path: string,
   options: RequestInit = {},
-  protectedRequest = false,
 ): Promise<T> {
   const headers = new Headers(options.headers);
   if (options.body) headers.set("Content-Type", "application/json");
-  if (protectedRequest) {
-    if (!internalKey) {
-      throw new ApiError(
-        "VITE_INTERNAL_API_KEY is not configured for this local admin build.",
-        0,
-      );
-    }
-    headers.set("x-internal-api-key", internalKey);
-  }
 
   let response: Response;
   try {
@@ -101,34 +80,6 @@ export const api = {
       method: "PUT",
       body: json({ auto_sims }),
     }),
-  updatePlayerToken: (playerId: string, player_token: string) =>
-    request<PlayerSummary>(
-      `/internal/players/${encodeURIComponent(playerId)}/token`,
-      { method: "PUT", body: json({ player_token }) },
-      true,
-    ),
-  clearPlayerToken: (playerId: string) =>
-    request<PlayerSummary>(
-      `/internal/players/${encodeURIComponent(playerId)}/token`,
-      { method: "DELETE" },
-      true,
-    ),
-  fetchPlayerStats: (playerId: string) =>
-    request<PlayerStatsVersion>(
-      `/internal/players/${encodeURIComponent(playerId)}/fetch-stats`,
-      { method: "POST" },
-      true,
-    ),
-  tt2PlayerStatus: () =>
-    request<Tt2PlayerStatus>("/internal/tt2/player-status", {}, true),
-  tt2ClanStatus: () =>
-    request<Tt2ClanStatus>("/internal/tt2/clan-status", {}, true),
-  fetchClanStats: () =>
-    request<Tt2ClanFetchResult>(
-      "/internal/tt2/fetch-clan-stats",
-      { method: "POST" },
-      true,
-    ),
   playerJobs: (playerId: string) =>
     request<SimulationJob[]>(`${playerPath(playerId)}/simulation-jobs`),
   playerAttackLog: (playerId: string) =>
@@ -180,58 +131,6 @@ export const api = {
       method: "POST",
       body: json(body),
     }),
-  updateBoss: (boss_data: BossData, attackable_parts: BossPartName[]) =>
-    request<BossUpdateAccepted>(
-      "/internal/current-boss",
-      {
-        method: "PUT",
-        body: json({ boss_data, attackable_parts, run_sims: false }),
-      },
-      true,
-    ),
-  createSimulation: (player_id: string, include_body_phase = false) =>
-    request<JobAccepted>(
-      "/internal/simulation-jobs",
-      { method: "POST", body: json({ player_id, include_body_phase }) },
-      true,
-    ),
-  createSimulationBatch: (player_ids: string[], include_body_phase = false) =>
-    request<SimulationBatchAccepted>(
-      "/internal/simulation-jobs/batch",
-      { method: "POST", body: json({ player_ids, include_body_phase }) },
-      true,
-    ),
-  simulationBatch: (batchId: string) =>
-    request<SimulationBatch>(
-      `/internal/simulation-jobs/batch/${encodeURIComponent(batchId)}`,
-      {},
-      true,
-    ),
-  internalJob: (jobId: string) =>
-    request<SimulationJob>(
-      `/internal/simulation-jobs/${encodeURIComponent(jobId)}`,
-      {},
-      true,
-    ),
-  retryJob: (jobId: string) =>
-    request<JobAccepted>(
-      `/internal/simulation-jobs/${encodeURIComponent(jobId)}/retry`,
-      { method: "POST" },
-      true,
-    ),
-  runDebugSimulation: (body: {
-    player_id: string;
-    boss_data: BossData;
-    attackable_parts: BossPartName[];
-    deck: string[];
-    total_taps: number;
-    rounds_per_pattern: number;
-  }) =>
-    request<DebugSimulationResponse>(
-      "/internal/simulation-debug",
-      { method: "POST", body: json(body) },
-      true,
-    ),
 };
 
 export const assetUrl = (path: string) => {
@@ -239,3 +138,8 @@ export const assetUrl = (path: string) => {
   if (path.startsWith("/assets/")) return path;
   return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 };
+
+// The backend used to send this path back on every card (redundant --
+// derivable from the card id alone), but the frontend owns these files
+// (public/assets/taptitan/cards/), so it owns the naming convention too.
+export const cardImagePath = (cardId: string) => `/assets/taptitan/cards/${cardId}.webp`;
