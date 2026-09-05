@@ -483,7 +483,13 @@ export default function TapTitan() {
             </>
           )}
         </section>
-        {loading && <div className="panel empty-state">Loading players…</div>}
+        {loading && (
+          <div className="player-grid" aria-busy="true" aria-label="Loading players">
+            {Array.from({ length: 8 }, (_, index) => (
+              <div className="player-option-skeleton" key={index} />
+            ))}
+          </div>
+        )}
         {!loading && error && (
           <div className="error-box standalone-error">{error}</div>
         )}

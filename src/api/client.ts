@@ -41,20 +41,32 @@ async function request<T>(
   const headers = new Headers(options.headers);
   if (options.body) headers.set("Content-Type", "application/json");
 
+  const url = `${baseUrl}${path}`;
+  // Left in for production too: when VITE_API_BASE_URL is misconfigured,
+  // this is the fastest way to see where a request actually went.
+  console.log(`[api] ${options.method ?? "GET"} ${url}`);
+
   let response: Response;
   try {
-    response = await fetch(`${baseUrl}${path}`, { ...options, headers });
+    response = await fetch(url, { ...options, headers });
   } catch {
-    throw new ApiError("Could not connect to the backend.", 0);
+    throw new ApiError(`Could not connect to ${url}.`, 0);
   }
 
-  const body = await response.json().catch(() => null);
+  const isJson = (response.headers.get("content-type") ?? "").includes("application/json");
+  const body = isJson ? await response.json().catch(() => null) : null;
   if (!response.ok) {
     const nested = body?.error ?? body?.data?.error;
     throw new ApiError(
-      nested?.message ?? body?.message ?? `Request failed (${response.status})`,
+      nested?.message ?? body?.message ?? `Request failed (${response.status}) for ${url}`,
       response.status,
       nested?.code ?? body?.code,
+    );
+  }
+  if (!isJson) {
+    throw new ApiError(
+      `Backend returned a non-JSON response for ${url}. Check VITE_API_BASE_URL.`,
+      response.status,
     );
   }
   return body as T;
