@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { assetUrl } from "../api/client";
+import { assetUrl, cardImagePath } from "../api/client";
 import type { CardDefinition, PlayerCard } from "../api/types";
 
 const normalizeCardKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -112,8 +112,8 @@ export default function ReRecommendModal({
                     title={excluded ? `${displayName} (excluded)` : `${displayName} (available)`}
                   >
                     <span className="card-art-wrap">
-                      {definition?.image ? (
-                        <img src={assetUrl(definition.image)} alt={`${displayName} raid card`} loading="lazy" />
+                      {definition ? (
+                        <img src={assetUrl(cardImagePath(card.card_id))} alt={`${displayName} raid card`} loading="lazy" />
                       ) : (
                         <span
                           className="deck-image-missing"

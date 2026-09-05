@@ -138,3 +138,8 @@ export const assetUrl = (path: string) => {
   if (path.startsWith("/assets/")) return path;
   return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 };
+
+// The backend used to send this path back on every card (redundant --
+// derivable from the card id alone), but the frontend owns these files
+// (public/assets/taptitan/cards/), so it owns the naming convention too.
+export const cardImagePath = (cardId: string) => `/assets/taptitan/cards/${cardId}.webp`;

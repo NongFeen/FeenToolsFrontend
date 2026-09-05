@@ -1,4 +1,4 @@
-import { assetUrl } from "../api/client";
+import { assetUrl, cardImagePath } from "../api/client";
 import type { CardDefinition, PlayerAttackLogEntry, RecommendedDeck } from "../api/types";
 
 const normalizeCardKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -148,8 +148,8 @@ function DeckIcons({ cards, definitions }: { cards: string[]; definitions: Map<s
         return (
           <span className="deck-image-wrap" key={`${cardId}-${index}`}>
             <span className="card-art-wrap">
-              {definition?.image ? (
-                <img src={assetUrl(definition.image)} alt={alt} loading="lazy" />
+              {definition ? (
+                <img src={assetUrl(cardImagePath(cardId))} alt={alt} loading="lazy" />
               ) : (
                 <span className="deck-image-missing" role="img" aria-label={`${alt} image unavailable`}>
                   Image unavailable

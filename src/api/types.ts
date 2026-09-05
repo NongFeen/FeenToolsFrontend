@@ -50,7 +50,6 @@ export interface CardDefinition {
   id: string;
   name: string;
   type: string;
-  image: string;
   seasonal_level_boost: number;
 }
 
@@ -205,7 +204,6 @@ export interface LiveCurrentBoss {
 export interface LiveAttackingCard {
   card_id: string;
   display_name: string;
-  image_url: string;
 }
 
 export interface LiveAttackingPlayer {
