@@ -1,4 +1,4 @@
-import { assetUrl } from "../api/client";
+import { assetUrl, cardImagePath } from "../api/client";
 import type { CardDefinition, PlayerCard, Recommendation, RecommendedDeck } from "../api/types";
 
 const normalizeCardKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -94,7 +94,7 @@ export default function RecommendationDecks({
                   );
                   return <span className="deck-image-wrap" key={cardId}>
                     <span className="card-art-wrap">
-                      {definition?.image ? <img src={assetUrl(definition.image)} alt={alt} loading="lazy" /> : <span className="deck-image-missing" role="img" aria-label={`${alt} image unavailable`}>Image unavailable</span>}
+                      {definition ? <img src={assetUrl(cardImagePath(cardId))} alt={alt} loading="lazy" /> : <span className="deck-image-missing" role="img" aria-label={`${alt} image unavailable`}>Image unavailable</span>}
                       {level !== undefined && <small className="card-level-badge">Lv {level}{Boolean(definition?.seasonal_level_boost) && <span className="seasonal-level-inline">+{definition!.seasonal_level_boost}</span>}</small>}
                     </span>
                     <small className="card-damage-label">{formatCompactDamage(cardDamage?.average_damage, damageMultiplier)}</small>
