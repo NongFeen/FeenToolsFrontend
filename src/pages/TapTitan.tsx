@@ -29,6 +29,37 @@ interface PreviewLayout {
   maxHeight: number;
 }
 
+interface RosterCache {
+  players: PlayerSummary[];
+  cards: CardDefinition[];
+  clanRecommendations: Record<string, PlayerRecommendationModes>;
+  fetchedAt: number;
+}
+// sessionStorage, not just a module variable -- a module variable only
+// survives client-side navigation (going to a player's page and back), not
+// an actual page refresh, which always re-executes the whole JS bundle
+// from scratch regardless of whether it's a hard or soft refresh.
+const ROSTER_CACHE_KEY = "taptitan-roster-cache";
+
+const readRosterCache = (): RosterCache | null => {
+  try {
+    const raw = sessionStorage.getItem(ROSTER_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as RosterCache) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeRosterCache = (cache: RosterCache) => {
+  try {
+    sessionStorage.setItem(ROSTER_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Ignore -- e.g. storage disabled/full. Worst case, next load refetches.
+  }
+};
+
+let rosterCache: RosterCache | null = readRosterCache();
+
 const loadRecommendationOrNull = async (
   playerId: string,
   includeBodyPhase: boolean,
@@ -121,6 +152,7 @@ export default function TapTitan() {
   const [raidCycleLoading, setRaidCycleLoading] = useState(true);
   const [loyaltyPercent, setLoyaltyPercent] = useState(34);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [hoveredPlayerId, setHoveredPlayerId] = useState("");
   const [previewLayout, setPreviewLayout] = useState<PreviewLayout>({
@@ -138,6 +170,7 @@ export default function TapTitan() {
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewRequestsRef = useRef(new Set<string>());
   const raidCycleRequestRef = useRef<Promise<RaidCycle> | null>(null);
+  const loadRequestIdRef = useRef(0);
   const moraleManuallyEditedRef = useRef(false);
   const damageMultiplier =
     (1 + moralePercent / 100) * (1 + loyaltyPercent / 100);
@@ -151,70 +184,125 @@ export default function TapTitan() {
       )
     : players;
 
-  useEffect(() => {
-    let active = true;
-    api
-      .players()
-      .then(async (data) => {
-        if (!active) return;
-        setPlayers(data);
-        const loaded = await Promise.all(
-          data.map(async (player) => {
-            const [currentResult, combinedResult] = await Promise.allSettled([
-              loadRecommendationOrNull(player.player_id, false),
-              loadRecommendationOrNull(player.player_id, true),
-            ]);
-            return [
-              player.player_id,
-              {
-                current:
-                  currentResult.status === "fulfilled"
-                    ? currentResult.value
-                    : null,
-                combined:
-                  combinedResult.status === "fulfilled"
-                    ? combinedResult.value
-                    : null,
-                currentError:
-                  currentResult.status === "rejected"
-                    ? currentResult.reason instanceof ApiError
-                      ? currentResult.reason.message
-                      : "Could not load current recommendation."
-                    : undefined,
-                combinedError:
-                  combinedResult.status === "rejected"
-                    ? combinedResult.reason instanceof ApiError
-                      ? combinedResult.reason.message
-                      : "Could not load Body/Void recommendation."
-                    : undefined,
-              },
-            ] as const;
-          }),
+  // force=true (the Refresh button) always re-fetches every player from
+  // scratch. Otherwise, cached players keep their already-loaded
+  // recommendation data untouched -- only players missing from the cache
+  // (new to the roster, or never successfully fetched) get requested.
+  const loadRoster = async (force = false) => {
+    const cached = force ? null : rosterCache;
+    const existingRecs = cached?.clanRecommendations ?? {};
+
+    const requestId = ++loadRequestIdRef.current;
+    const isStale = () => loadRequestIdRef.current !== requestId;
+
+    if (cached) {
+      setPlayers(cached.players);
+      setCards(cached.cards);
+      setClanRecommendations(cached.clanRecommendations);
+    }
+    setLoading(!cached);
+    setClanRecommendationsLoading(!cached);
+    if (force) setRefreshing(true);
+
+    const cardsPromise =
+      cached && cached.cards.length > 0
+        ? Promise.resolve(cached.cards)
+        : api.cards().catch(() => cached?.cards ?? []);
+
+    try {
+      const data = await api.players();
+      if (isStale()) return;
+      setPlayers(data);
+      setLoading(false);
+
+      const playersNeedingFetch = data.filter(
+        (player) => !(player.player_id in existingRecs),
+      );
+
+      const cardsData = await cardsPromise;
+      if (isStale()) return;
+      setCards(cardsData);
+
+      if (playersNeedingFetch.length === 0) {
+        setClanRecommendationsLoading(false);
+        setError("");
+        rosterCache = {
+          players: data,
+          cards: cardsData,
+          clanRecommendations: existingRecs,
+          fetchedAt: Date.now(),
+        };
+        writeRosterCache(rosterCache);
+        return;
+      }
+
+      const loaded = await Promise.all(
+        playersNeedingFetch.map(async (player) => {
+          const [currentResult, combinedResult] = await Promise.allSettled([
+            loadRecommendationOrNull(player.player_id, false),
+            loadRecommendationOrNull(player.player_id, true),
+          ]);
+          return [
+            player.player_id,
+            {
+              current:
+                currentResult.status === "fulfilled"
+                  ? currentResult.value
+                  : null,
+              combined:
+                combinedResult.status === "fulfilled"
+                  ? combinedResult.value
+                  : null,
+              currentError:
+                currentResult.status === "rejected"
+                  ? currentResult.reason instanceof ApiError
+                    ? currentResult.reason.message
+                    : "Could not load current recommendation."
+                  : undefined,
+              combinedError:
+                combinedResult.status === "rejected"
+                  ? combinedResult.reason instanceof ApiError
+                    ? combinedResult.reason.message
+                    : "Could not load Body/Void recommendation."
+                  : undefined,
+            },
+          ] as const;
+        }),
+      );
+      if (isStale()) return;
+      const merged = { ...existingRecs, ...Object.fromEntries(loaded) };
+      setClanRecommendations(merged);
+      setError("");
+      rosterCache = {
+        players: data,
+        cards: cardsData,
+        clanRecommendations: merged,
+        fetchedAt: Date.now(),
+      };
+      writeRosterCache(rosterCache);
+    } catch (reason) {
+      if (!isStale())
+        setError(
+          reason instanceof ApiError
+            ? reason.message
+            : "Failed to load players.",
         );
-        if (active) setClanRecommendations(Object.fromEntries(loaded));
-      })
-      .catch((reason) => {
-        if (active)
-          setError(
-            reason instanceof ApiError
-              ? reason.message
-              : "Failed to load players.",
-          );
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-          setClanRecommendationsLoading(false);
-        }
-      });
-    api
-      .cards()
-      .then((data) => {
-        if (active) setCards(data);
-      })
-      .catch(() => undefined);
+    } finally {
+      if (!isStale()) {
+        setLoading(false);
+        setClanRecommendationsLoading(false);
+        setRefreshing(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    // Deferred to a microtask -- loadRoster's cache-hit branch calls
+    // setState before its first await, which would otherwise run
+    // synchronously as part of this effect's own call stack.
+    void Promise.resolve().then(() => loadRoster(false));
     return () => {
-      active = false;
+      loadRequestIdRef.current += 1;
     };
   }, []);
 
@@ -423,6 +511,14 @@ export default function TapTitan() {
                 />
               </label>
             </div>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => loadRoster(true)}
+              disabled={refreshing || loading}
+            >
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </button>
           </div>
           {clanRecommendationsLoading && (
             <p>Fetching recommendations for all listed players…</p>
@@ -483,7 +579,13 @@ export default function TapTitan() {
             </>
           )}
         </section>
-        {loading && <div className="panel empty-state">Loading players…</div>}
+        {loading && (
+          <div className="player-grid" aria-busy="true" aria-label="Loading players">
+            {Array.from({ length: 8 }, (_, index) => (
+              <div className="player-option-skeleton" key={index} />
+            ))}
+          </div>
+        )}
         {!loading && error && (
           <div className="error-box standalone-error">{error}</div>
         )}
@@ -505,9 +607,14 @@ export default function TapTitan() {
           </label>
         )}
         <div className="player-grid">
-          {filteredPlayers.map((player) => (
+          {filteredPlayers.map((player) => {
+            const hasRecommendationData = Boolean(
+              clanRecommendations[player.player_id]?.current ||
+                clanRecommendations[player.player_id]?.combined,
+            );
+            return (
             <Link
-              className="player-option"
+              className={`player-option${hasRecommendationData ? " player-option-has-data" : ""}`}
               key={player.player_id}
               to={`/tools/taptitan/players/${encodeURIComponent(player.player_id)}`}
               onMouseEnter={(event) =>
@@ -637,7 +744,8 @@ export default function TapTitan() {
                 </div>
               )}
             </Link>
-          ))}
+            );
+          })}
         </div>
         {!loading &&
           !error &&
