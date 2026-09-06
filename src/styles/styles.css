@@ -440,6 +440,10 @@ button:disabled {
   box-shadow: 0 8px 24px rgba(45, 37, 30, 0.06);
   transform: translateY(-1px);
 }
+.player-option-has-data {
+  border-color: var(--success);
+  background: var(--success-light);
+}
 .player-option h2 {
   font-size: 0.95rem;
 }
