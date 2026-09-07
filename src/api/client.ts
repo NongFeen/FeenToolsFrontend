@@ -2,6 +2,7 @@ import type {
   CardDefinition,
   ConvertedPlayerDataResponse,
   CurrentBoss,
+  CycleAttackSummary,
   HealthResponse,
   LiveAttackingPlayer,
   LiveCurrentBoss,
@@ -104,6 +105,8 @@ export const api = {
     request<LiveAttackingPlayer[]>("/api/live-attacking-players"),
   liveAttackingPlayersStreamUrl: () => `${baseUrl}/api/live-attacking-players/stream`,
   currentRaidCycle: () => request<RaidCycle>("/api/raid-cycle/current"),
+  cycleAttackSummary: () =>
+    request<CycleAttackSummary>("/api/raid-cycle/current/attack-summary"),
   recommendation: (
     playerId: string,
     deckCount: number,
