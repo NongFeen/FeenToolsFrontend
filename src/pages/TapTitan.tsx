@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, ApiError, assetUrl, cardImagePath } from "../api/client";
 import type {
   CardDefinition,
+  CycleAttackSummary,
   PlayerSummary,
   RaidCycle,
   Recommendation,
@@ -95,12 +96,24 @@ const summarizeRecommendations = (
       total + BigInt(recommendation.total_average_damage.split(".")[0]),
     0n,
   );
+  const totalLowest = available.reduce(
+    (total, recommendation) =>
+      total +
+      recommendation.decks.reduce(
+        (deckTotal, deck) =>
+          deckTotal +
+          BigInt(Math.trunc(deck.result?.best_pattern?.lowest_round_damage ?? 0)),
+        0n,
+      ),
+    0n,
+  );
   const totalDecks = available.reduce(
     (total, recommendation) => total + recommendation.decks.length,
     0,
   );
   return {
     totalDamage: totalDamage.toString(),
+    totalLowest: totalLowest.toString(),
     averagePerDeck:
       totalDecks === 0 ? "0" : (totalDamage / BigInt(totalDecks)).toString(),
     playersCalculated: available.length,
@@ -112,6 +125,10 @@ const summarizeRecommendations = (
     ).length,
   };
 };
+
+// Each player gets a fixed number of attacks per raid cycle -- used as the
+// denominator for the clan-wide "attacks used" ratio.
+const ATTACKS_PER_PLAYER_PER_CYCLE = 6;
 
 const readableCardName = (cardId: string) =>
   cardId.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
@@ -150,6 +167,10 @@ export default function TapTitan() {
   const [moralePercent, setMoralePercent] = useState(0);
   const [raidCycle, setRaidCycle] = useState<RaidCycle | null>(null);
   const [raidCycleLoading, setRaidCycleLoading] = useState(true);
+  const [cycleAttackSummary, setCycleAttackSummary] =
+    useState<CycleAttackSummary | null>(null);
+  const [cycleAttackSummaryLoading, setCycleAttackSummaryLoading] =
+    useState(true);
   const [loyaltyPercent, setLoyaltyPercent] = useState(34);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -322,6 +343,22 @@ export default function TapTitan() {
       .catch(() => undefined)
       .finally(() => {
         if (active) setRaidCycleLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .cycleAttackSummary()
+      .then((summary) => {
+        if (active) setCycleAttackSummary(summary);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setCycleAttackSummaryLoading(false);
       });
     return () => {
       active = false;
@@ -534,6 +571,13 @@ export default function TapTitan() {
                     damageMultiplier,
                   )}
                 </strong>
+                <span>Combined lowest damage</span>
+                <strong>
+                  {formatCompactDamage(
+                    currentSummary.totalLowest,
+                    damageMultiplier,
+                  )}
+                </strong>
                 <span>Average damage per deck</span>
                 <strong>
                   {formatCompactDamage(
@@ -558,6 +602,13 @@ export default function TapTitan() {
                     damageMultiplier,
                   )}
                 </strong>
+                <span>Combined lowest damage</span>
+                <strong>
+                  {formatCompactDamage(
+                    combinedSummary.totalLowest,
+                    damageMultiplier,
+                  )}
+                </strong>
                 <span>Average damage per deck</span>
                 <strong>
                   {formatCompactDamage(
@@ -576,6 +627,69 @@ export default function TapTitan() {
                 cycle={raidCycle}
                 loading={raidCycleLoading}
               />
+            </>
+          )}
+        </section>
+        <section className="panel section-gap" aria-label="Current cycle attack totals">
+          <h2 className="panel-title">Current cycle</h2>
+          {cycleAttackSummaryLoading && <p>Loading cycle attack totals…</p>}
+          {!cycleAttackSummaryLoading && !cycleAttackSummary && (
+            <p className="muted-copy">No attacks recorded yet for the current raid.</p>
+          )}
+          {!cycleAttackSummaryLoading && cycleAttackSummary && (
+            <>
+              <div className="cycle-summary-stats">
+                <div>
+                  <span>Total damage dealt</span>
+                  <strong>
+                    {formatCompactDamage(cycleAttackSummary.total_damage)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Attacks used</span>
+                  <strong>
+                    {cycleAttackSummary.attack_count} /{" "}
+                    {players.length * ATTACKS_PER_PLAYER_PER_CYCLE}
+                  </strong>
+                </div>
+              </div>
+              {cycleAttackSummary.card_usage.length > 0 && (
+                <div className="cycle-card-usage">
+                  <h3 className="attack-log-subtitle">Card usage this cycle</h3>
+                  <div className="cycle-card-usage-grid">
+                    {cycleAttackSummary.card_usage.map((usage) => {
+                      const definition = cardDefinitions.get(
+                        normalizeCardKey(usage.card_id),
+                      );
+                      const displayName =
+                        definition?.name ?? readableCardName(usage.card_id);
+                      return (
+                        <div className="cycle-card-usage-item" key={usage.card_id}>
+                          <span className="card-art-wrap">
+                            {definition ? (
+                              <img
+                                src={assetUrl(cardImagePath(usage.card_id))}
+                                alt={displayName}
+                                title={displayName}
+                                loading="lazy"
+                              />
+                            ) : (
+                              <span
+                                className="deck-image-missing"
+                                role="img"
+                                aria-label={`${displayName} image unavailable`}
+                              >
+                                Image unavailable
+                              </span>
+                            )}
+                          </span>
+                          <small>{usage.uses}×</small>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </section>
