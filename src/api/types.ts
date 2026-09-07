@@ -292,6 +292,18 @@ export interface RaidCycle {
   updated_at: string;
 }
 
+export interface CardUsage {
+  card_id: string;
+  uses: number;
+}
+
+export interface CycleAttackSummary {
+  cycle: number;
+  total_damage: string;
+  attack_count: number;
+  card_usage: CardUsage[];
+}
+
 export interface ConvertedPlayerDataResponse {
   success: "true" | true;
   data: { data: PlayerRaidData };
