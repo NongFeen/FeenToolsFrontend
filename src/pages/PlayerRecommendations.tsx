@@ -26,6 +26,9 @@ const deckCountOptions = Array.from(
 );
 const errorMessage = (error: unknown, fallback: string) =>
   error instanceof ApiError ? error.message : fallback;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const RECOMMENDATION_POLL_INTERVAL_MS = 10000;
+const RECOMMENDATION_POLL_MAX_ATTEMPTS = 100; 
 const clampPercent = (value: number, maximum: number) =>
   Number.isFinite(value) ? Math.min(maximum, Math.max(0, value)) : 0;
 
@@ -73,6 +76,35 @@ export default function PlayerRecommendations() {
   const includeBodyPhase = recommendationMode === "combined";
   const recommendationKey = `${deckCount}:${recommendationMode}`;
 
+  const pollForRecommendation = useCallback(
+    async (requestId: number): Promise<Recommendation> => {
+      let lastNotFound: ApiError | null = null;
+      for (let attempt = 0; attempt < RECOMMENDATION_POLL_MAX_ATTEMPTS; attempt += 1) {
+        if (recommendationRequestRef.current !== requestId) {
+          throw lastNotFound ?? new ApiError("Recommendation request superseded.", 404);
+        }
+        try {
+          return await api.recommendation(
+            playerId,
+            deckCount,
+            mustIncludeMirrorForce,
+            mustIncludeTeamTactics,
+            includeBodyPhase,
+          );
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.status !== 404) throw error;
+          lastNotFound = error;
+          await sleep(RECOMMENDATION_POLL_INTERVAL_MS);
+        }
+      }
+      throw (
+        lastNotFound ??
+        new ApiError("Recommendation is taking longer than expected to generate.", 404)
+      );
+    },
+    [playerId, deckCount, mustIncludeMirrorForce, mustIncludeTeamTactics, includeBodyPhase],
+  );
+
   const loadRecommendations = useCallback(async (preserveExisting = false) => {
     const requestId = ++recommendationRequestRef.current;
     if (!recommendationsInitializedRef.current) {
@@ -95,17 +127,18 @@ export default function PlayerRecommendations() {
         if (recommendationRequestRef.current !== requestId) return;
         if (!generatedDeckCountsRef.current.has(recommendationKey)) {
           setGeneratingRecommendation(true);
-          await api.generateRecommendations(playerId, deckCount, includeBodyPhase);
+          try {
+            await api.generateRecommendations(playerId, deckCount, includeBodyPhase);
+          } catch {
+            // A large deck_count with required cards can run long enough to
+            // outlast this request client-side even though the backend
+            // keeps working regardless -- fall through to polling instead
+            // of failing outright.
+          }
           if (recommendationRequestRef.current !== requestId) return;
           generatedDeckCountsRef.current.add(recommendationKey);
         }
-        recommendation = await api.recommendation(
-          playerId,
-          deckCount,
-          mustIncludeMirrorForce,
-          mustIncludeTeamTactics,
-          includeBodyPhase,
-        );
+        recommendation = await pollForRecommendation(requestId);
       }
       if (recommendationRequestRef.current !== requestId) return;
       if (includeBodyPhase && !recommendation.body_phase_ran) {
@@ -143,7 +176,7 @@ export default function PlayerRecommendations() {
         setGeneratingRecommendation(false);
       }
     }
-  }, [deckCount, includeBodyPhase, mustIncludeMirrorForce, mustIncludeTeamTactics, playerId, recommendationKey]);
+  }, [deckCount, includeBodyPhase, mustIncludeMirrorForce, mustIncludeTeamTactics, playerId, recommendationKey, pollForRecommendation]);
 
   const refreshCurrentData = useCallback(async () => {
     setRefreshing(true);
