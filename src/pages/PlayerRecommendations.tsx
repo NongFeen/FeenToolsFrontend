@@ -24,6 +24,15 @@ const deckCountOptions = Array.from(
   { length: MAX_DECK_COUNT },
   (_, index) => index + 1,
 );
+// Re-recommend re-runs the exhaustive deck search synchronously on every
+// call (not as a background job), so it's capped lower than the general
+// recommendation limit to keep that search fast -- matches
+// MAX_CUSTOM_RECOMMENDATION_DECK_COUNT on the backend.
+const RERECOMMEND_MAX_DECK_COUNT = 9;
+const rerecommendDeckCountOptions = Array.from(
+  { length: RERECOMMEND_MAX_DECK_COUNT },
+  (_, index) => index + 1,
+);
 const errorMessage = (error: unknown, fallback: string) =>
   error instanceof ApiError ? error.message : fallback;
 const clampPercent = (value: number, maximum: number) =>
@@ -529,8 +538,8 @@ export default function PlayerRecommendations() {
           onSubmit={handleReRecommend}
           playerCards={player.stats?.card_list ?? []}
           cards={cards}
-          deckCountOptions={deckCountOptions}
-          initialDeckCount={deckCount}
+          deckCountOptions={rerecommendDeckCountOptions}
+          initialDeckCount={Math.min(deckCount, RERECOMMEND_MAX_DECK_COUNT)}
           initialMustIncludeMirrorForce={mustIncludeMirrorForce}
           initialMustIncludeTeamTactics={mustIncludeTeamTactics}
           submitting={rerecommendSubmitting}
