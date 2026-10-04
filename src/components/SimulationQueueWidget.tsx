@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import type { SimulationQueue, SimulationQueueEntry } from "../api/types";
 
 const QUEUE_POLL_INTERVAL_MS = 5_000;
+const NEXT_UP_LIMIT = 6;
 
 export const useSimulationQueue = () => {
   const [queue, setQueue] = useState<SimulationQueue | null>(null);
@@ -41,20 +42,8 @@ const formatTime = (iso: string | null) => {
     : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 };
 
-const statusLabel = (entry: SimulationQueueEntry) => {
-  switch (entry.status) {
-    case "running":
-      return "Simulating";
-    case "optimizing":
-      return "Building recommendation";
-    case "pending":
-      return entry.position !== null ? `Waiting · #${entry.position}` : "Waiting";
-    case "completed":
-      return "Done";
-    case "failed":
-      return "Failed";
-  }
-};
+const isRunning = (entry: SimulationQueueEntry) =>
+  entry.status === "running" || entry.status === "optimizing";
 
 interface SimulationQueueWidgetProps {
   queue: SimulationQueue | null;
@@ -62,38 +51,100 @@ interface SimulationQueueWidgetProps {
 }
 
 export default function SimulationQueueWidget({ queue, error }: SimulationQueueWidgetProps) {
-  // The API returns most-recently-finished first; show earliest-first so the
-  // top of the list is whoever got their sim first.
-  const finishOrder = queue ? [...queue.recently_completed].reverse() : [];
+  if (error) {
+    return (
+      <section className="simulation-queue-card" aria-label="Simulation queue">
+        <strong className="simulation-queue-error">{error}</strong>
+      </section>
+    );
+  }
+  if (!queue) return null;
+
+  const running = queue.active.filter(isRunning);
+  const waiting = queue.active.filter((entry) => entry.status === "pending");
+  // Most recently finished first from the API; show earliest-first so the top
+  // of the list is whoever got their sim first.
+  const finished = [...queue.recently_completed].reverse();
+  const nextUp = waiting.slice(0, NEXT_UP_LIMIT);
+  const moreWaiting = waiting.length - nextUp.length;
 
   return (
     <section className="simulation-queue-card" aria-label="Simulation queue">
-      <div className="simulation-queue-column">
-        <span>Queue</span>
-        {error && <strong className="simulation-queue-error">{error}</strong>}
-        {!error && queue && queue.active.length === 0 && (
-          <strong>No simulations waiting.</strong>
-        )}
-        {queue?.active.map((entry) => (
-          <div className="simulation-queue-row" key={entry.job_id}>
-            <strong>{entry.display_name}</strong>
-            <small>
-              {statusLabel(entry)} · since {formatTime(entry.created_at)}
-            </small>
+      <header className="simulation-queue-summary">
+        <span>
+          <strong>{waiting.length}</strong> waiting
+        </span>
+        <span>
+          <strong>{running.length}</strong> running
+        </span>
+        <span>
+          <strong>{finished.length}</strong> finished
+        </span>
+      </header>
+
+      {running.length > 0 && (
+        <div className="simulation-queue-running">
+          {running.map((entry) => (
+            <span className="simulation-queue-chip is-running" key={entry.job_id}>
+              {entry.display_name}
+              <small>{entry.status === "optimizing" ? "building" : "simulating"}</small>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {nextUp.length > 0 && (
+        <div className="simulation-queue-next">
+          <span className="simulation-queue-label">Next up</span>
+          <div className="simulation-queue-chips">
+            {nextUp.map((entry) => (
+              <span className="simulation-queue-chip" key={entry.job_id}>
+                <em>#{entry.position}</em> {entry.display_name}
+              </span>
+            ))}
+            {moreWaiting > 0 && (
+              <span className="simulation-queue-chip is-more">+{moreWaiting} more</span>
+            )}
           </div>
-        ))}
-      </div>
-      <div className="simulation-queue-column">
-        <span>Finished (first first)</span>
-        {finishOrder.length === 0 && !error && <strong>Nothing finished yet.</strong>}
-        {finishOrder.map((entry, index) => (
-          <div className="simulation-queue-row" key={entry.job_id}>
-            <strong>
-              {index + 1}. {entry.display_name}
-            </strong>
-            <small>{formatTime(entry.completed_at)}</small>
-          </div>
-        ))}
+        </div>
+      )}
+
+      {queue.active.length === 0 && (
+        <p className="simulation-queue-empty">No simulations waiting.</p>
+      )}
+
+      <div className="simulation-queue-lists">
+        <div className="simulation-queue-list">
+          <span className="simulation-queue-label">Waiting ({waiting.length})</span>
+          {waiting.length === 0 ? (
+            <small className="simulation-queue-empty">Nobody waiting.</small>
+          ) : (
+            <ol>
+              {waiting.map((entry) => (
+                <li key={entry.job_id}>
+                  <span>
+                    <em>#{entry.position}</em> {entry.display_name}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+        <div className="simulation-queue-list">
+          <span className="simulation-queue-label">Finished, first first</span>
+          {finished.length === 0 ? (
+            <small className="simulation-queue-empty">Nothing finished yet.</small>
+          ) : (
+            <ol>
+              {finished.map((entry) => (
+                <li key={entry.job_id}>
+                  <span>{entry.display_name}</span>
+                  <small>{formatTime(entry.completed_at)}</small>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       </div>
     </section>
   );

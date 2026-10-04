@@ -186,35 +186,117 @@ button:disabled {
 .simulation-queue-card {
   width: min(100%, 100%);
   margin-top: 1rem;
-  padding: 0.85rem 1rem;
+  padding: 0.75rem 0.9rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 1rem 1.25rem;
+  gap: 0.6rem;
+  align-content: start;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-}
-.simulation-queue-column {
-  display: grid;
-  gap: 0.4rem;
-  align-content: start;
   min-width: 0;
 }
-.simulation-queue-column > span {
+.simulation-queue-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.simulation-queue-summary strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.simulation-queue-label {
+  display: block;
+  margin-bottom: 0.3rem;
   color: var(--text-muted);
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.simulation-queue-row {
+.simulation-queue-chips,
+.simulation-queue-running {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.simulation-queue-running {
+  margin-bottom: -0.2rem;
+}
+.simulation-queue-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  max-width: 100%;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.simulation-queue-chip em {
+  font-style: normal;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.simulation-queue-chip small {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+.simulation-queue-chip.is-running {
+  border-color: var(--accent, #4a90e2);
+}
+.simulation-queue-chip.is-more {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.simulation-queue-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.simulation-queue-lists {
   display: grid;
-  gap: 0.1rem;
-  padding: 0.35rem 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem 1rem;
+  min-width: 0;
+}
+.simulation-queue-list {
+  min-width: 0;
+}
+.simulation-queue-list ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.15rem;
+  max-height: 12rem;
+  overflow: auto;
+}
+.simulation-queue-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.8rem;
   border-radius: var(--radius);
 }
-.simulation-queue-row small {
+.simulation-queue-list li:nth-child(odd) {
+  background: color-mix(in srgb, var(--border) 25%, transparent);
+}
+.simulation-queue-list li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.simulation-queue-list li small {
+  flex-shrink: 0;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
 }
 .simulation-queue-error {
   color: var(--danger, #c0392b);
