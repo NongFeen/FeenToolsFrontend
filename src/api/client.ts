@@ -15,6 +15,7 @@ import type {
   RecommendationGenerationResponse,
   RaidCycle,
   SimulationJob,
+  SimulationQueue,
 } from "./types";
 
 const baseUrl = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -107,6 +108,7 @@ export const api = {
   currentRaidCycle: () => request<RaidCycle>("/api/raid-cycle/current"),
   cycleAttackSummary: () =>
     request<CycleAttackSummary>("/api/raid-cycle/current/attack-summary"),
+  simulationQueue: () => request<SimulationQueue>("/api/simulation-queue"),
   recommendation: (
     playerId: string,
     deckCount: number,

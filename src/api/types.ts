@@ -308,3 +308,26 @@ export interface ConvertedPlayerDataResponse {
   success: "true" | true;
   data: { data: PlayerRaidData };
 }
+
+export type SimulationJobStatus =
+  | "pending"
+  | "running"
+  | "optimizing"
+  | "completed"
+  | "failed";
+
+export interface SimulationQueueEntry {
+  job_id: string;
+  player_id: string;
+  display_name: string;
+  status: SimulationJobStatus;
+  position: number | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface SimulationQueue {
+  active: SimulationQueueEntry[];
+  recently_completed: SimulationQueueEntry[];
+}

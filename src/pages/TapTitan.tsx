@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError, assetUrl, cardImagePath } from "../api/client";
 import type {
@@ -10,6 +10,7 @@ import type {
 } from "../api/types";
 import Navbar from "../components/Navbar";
 import RaidResetCountdown from "../components/RaidResetCountdown";
+import SimulationQueueWidget, { useSimulationQueue } from "../components/SimulationQueueWidget";
 
 interface DeckPreview {
   loading: boolean;
@@ -60,6 +61,7 @@ const writeRosterCache = (cache: RosterCache) => {
 };
 
 let rosterCache: RosterCache | null = readRosterCache();
+const PENDING_RECOMMENDATION_POLL_MS = 10_000;
 
 const loadRecommendationOrNull = async (
   playerId: string,
@@ -80,6 +82,39 @@ const loadRecommendationOrNull = async (
     if (reason instanceof ApiError && reason.status === 404) return null;
     throw reason;
   }
+};
+
+// Nothing generated yet for this player (their sim is still queued/running),
+// as opposed to a fetch that actually failed.
+const isRecommendationPending = (modes: PlayerRecommendationModes) =>
+  modes.current === null &&
+  modes.combined === null &&
+  !modes.currentError &&
+  !modes.combinedError;
+
+const fetchPlayerRecommendations = async (
+  playerId: string,
+): Promise<PlayerRecommendationModes> => {
+  const [currentResult, combinedResult] = await Promise.allSettled([
+    loadRecommendationOrNull(playerId, false),
+    loadRecommendationOrNull(playerId, true),
+  ]);
+  return {
+    current: currentResult.status === "fulfilled" ? currentResult.value : null,
+    combined: combinedResult.status === "fulfilled" ? combinedResult.value : null,
+    currentError:
+      currentResult.status === "rejected"
+        ? currentResult.reason instanceof ApiError
+          ? currentResult.reason.message
+          : "Could not load current recommendation."
+        : undefined,
+    combinedError:
+      combinedResult.status === "rejected"
+        ? combinedResult.reason instanceof ApiError
+          ? combinedResult.reason.message
+          : "Could not load Body/Void recommendation."
+        : undefined,
+  };
 };
 
 const summarizeRecommendations = (
@@ -186,6 +221,9 @@ export default function TapTitan() {
   const [clanRecommendations, setClanRecommendations] = useState<
     Record<string, PlayerRecommendationModes>
   >({});
+  const clanRecommendationsRef = useRef(clanRecommendations);
+  const pendingRefreshInFlightRef = useRef(false);
+  const { queue: simulationQueue, error: simulationQueueError } = useSimulationQueue();
   const [clanRecommendationsLoading, setClanRecommendationsLoading] =
     useState(true);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -236,8 +274,12 @@ export default function TapTitan() {
       setPlayers(data);
       setLoading(false);
 
+      // A player whose cached entry is still pending (sim not finished when we
+      // last looked) needs re-fetching, not just players we've never seen.
       const playersNeedingFetch = data.filter(
-        (player) => !(player.player_id in existingRecs),
+        (player) =>
+          !(player.player_id in existingRecs) ||
+          isRecommendationPending(existingRecs[player.player_id]),
       );
 
       const cardsData = await cardsPromise;
@@ -259,35 +301,8 @@ export default function TapTitan() {
 
       const loaded = await Promise.all(
         playersNeedingFetch.map(async (player) => {
-          const [currentResult, combinedResult] = await Promise.allSettled([
-            loadRecommendationOrNull(player.player_id, false),
-            loadRecommendationOrNull(player.player_id, true),
-          ]);
-          return [
-            player.player_id,
-            {
-              current:
-                currentResult.status === "fulfilled"
-                  ? currentResult.value
-                  : null,
-              combined:
-                combinedResult.status === "fulfilled"
-                  ? combinedResult.value
-                  : null,
-              currentError:
-                currentResult.status === "rejected"
-                  ? currentResult.reason instanceof ApiError
-                    ? currentResult.reason.message
-                    : "Could not load current recommendation."
-                  : undefined,
-              combinedError:
-                combinedResult.status === "rejected"
-                  ? combinedResult.reason instanceof ApiError
-                    ? combinedResult.reason.message
-                    : "Could not load Body/Void recommendation."
-                  : undefined,
-            },
-          ] as const;
+          const modes = await fetchPlayerRecommendations(player.player_id);
+          return [player.player_id, modes] as const;
         }),
       );
       if (isStale()) return;
@@ -326,6 +341,65 @@ export default function TapTitan() {
       loadRequestIdRef.current += 1;
     };
   }, []);
+
+  // Players whose sim hasn't finished yet have no recommendation to show, so
+  // keep checking just those until each one lands -- no manual Refresh needed.
+  useEffect(() => {
+    clanRecommendationsRef.current = clanRecommendations;
+  }, [clanRecommendations]);
+
+  const refreshPendingRecommendations = useCallback(async () => {
+    if (pendingRefreshInFlightRef.current) return;
+    const pendingIds = Object.entries(clanRecommendationsRef.current)
+      .filter(([, modes]) => isRecommendationPending(modes))
+      .map(([playerId]) => playerId);
+    if (pendingIds.length === 0) return;
+
+    pendingRefreshInFlightRef.current = true;
+    try {
+      const updated = await Promise.all(
+        pendingIds.map(async (playerId) => {
+          const modes = await fetchPlayerRecommendations(playerId);
+          return [playerId, modes] as const;
+        }),
+      );
+      const merged = {
+        ...clanRecommendationsRef.current,
+        ...Object.fromEntries(updated),
+      };
+      clanRecommendationsRef.current = merged;
+      setClanRecommendations(merged);
+      if (rosterCache) {
+        rosterCache = { ...rosterCache, clanRecommendations: merged, fetchedAt: Date.now() };
+        writeRosterCache(rosterCache);
+      }
+    } finally {
+      pendingRefreshInFlightRef.current = false;
+    }
+  }, []);
+
+  // Only poll for pending players while the queue has work in it -- with
+  // nothing waiting or running, no pending sim can finish, so checking would
+  // just be wasted requests.
+  const queueActive = (simulationQueue?.active.length ?? 0) > 0;
+  useEffect(() => {
+    if (!queueActive) return;
+    const intervalId = window.setInterval(
+      () => void refreshPendingRecommendations(),
+      PENDING_RECOMMENDATION_POLL_MS,
+    );
+    return () => window.clearInterval(intervalId);
+  }, [queueActive, refreshPendingRecommendations]);
+
+  // The queue draining means the last job just finished -- check once more so
+  // its player's recommendation doesn't wait for the next interval or Refresh.
+  const wasQueueActiveRef = useRef(false);
+  useEffect(() => {
+    if (wasQueueActiveRef.current && !queueActive) {
+      void refreshPendingRecommendations();
+    }
+    wasQueueActiveRef.current = queueActive;
+  }, [queueActive, refreshPendingRecommendations]);
 
   useEffect(() => {
     let active = true;
@@ -629,6 +703,7 @@ export default function TapTitan() {
               />
             </>
           )}
+          <SimulationQueueWidget queue={simulationQueue} error={simulationQueueError} />
         </section>
         <section className="panel section-gap" aria-label="Current cycle attack totals">
           <h2 className="panel-title">Current cycle</h2>
