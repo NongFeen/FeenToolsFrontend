@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import type {
@@ -31,6 +31,13 @@ const RECOMMENDATION_POLL_INTERVAL_MS = 10000;
 const RECOMMENDATION_POLL_MAX_ATTEMPTS = 100; 
 const clampPercent = (value: number, maximum: number) =>
   Number.isFinite(value) ? Math.min(maximum, Math.max(0, value)) : 0;
+// Attacks the player has made in the clan's current cycle. Not the player's
+// latest entries: a player with no attacks yet this cycle has only older ones.
+const attacksThisCycle = (entries: PlayerAttackLogEntry[], cycle: number | null) =>
+  entries.filter((entry) => entry.cycle === cycle).length;
+// Each unused attack gets one recommended deck; a finished player gets the full set.
+const defaultDeckCountFor = (attacksDone: number) =>
+  attacksDone >= DEFAULT_DECK_COUNT ? DEFAULT_DECK_COUNT : DEFAULT_DECK_COUNT - attacksDone;
 
 export default function PlayerRecommendations() {
   const { playerId = "" } = useParams();
@@ -40,8 +47,14 @@ export default function PlayerRecommendations() {
   const [latestJob, setLatestJob] = useState<SimulationJob | null>(null);
   const [jobsReady, setJobsReady] = useState(false);
   const [deckCount, setDeckCount] = useState(DEFAULT_DECK_COUNT);
+  // The default deck count depends on the attack log, so no recommendation is
+  // requested until it has loaded (otherwise a 6-deck request would fire first).
+  const [deckCountReady, setDeckCountReady] = useState(false);
+  const deckCountReadyRef = useRef(false);
   const [mustIncludeMirrorForce, setMustIncludeMirrorForce] = useState(true);
   const [mustIncludeTeamTactics, setMustIncludeTeamTactics] = useState(true);
+  // On: recommend only with cards not used this cycle. Off: the normal recommendation.
+  const [excludeUsedCards, setExcludeUsedCards] = useState(true);
   const [recommendationMode, setRecommendationMode] = useState<"current" | "combined">("current");
   const [moralePercent, setMoralePercent] = useState(0);
   const setEditableMoralePercent = useRaidMoraleDefault(setMoralePercent);
@@ -60,6 +73,18 @@ export default function PlayerRecommendations() {
   const [attackLog, setAttackLog] = useState<PlayerAttackLogEntry[]>([]);
   const [attackLogLoading, setAttackLogLoading] = useState(true);
   const [attackLogError, setAttackLogError] = useState("");
+  const [currentCycle, setCurrentCycle] = useState<number | null>(null);
+  // Every card the player has attacked with in the clan's current cycle, deduplicated.
+  const usedCycleCards = useMemo(() => {
+    const cards = new Set<string>();
+    for (const entry of attackLog) {
+      if (entry.cycle !== currentCycle) continue;
+      for (const cardId of [entry.card1, entry.card2, entry.card3]) {
+        if (cardId) cards.add(cardId);
+      }
+    }
+    return [...cards];
+  }, [attackLog, currentCycle]);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const [rerecommendOpen, setRerecommendOpen] = useState(false);
@@ -74,7 +99,7 @@ export default function PlayerRecommendations() {
   const pendingScrollPositionRef = useRef<number | null>(null);
   const damageMultiplier = (1 + moralePercent / 100) * (1 + loyaltyPercent / 100);
   const includeBodyPhase = recommendationMode === "combined";
-  const recommendationKey = `${deckCount}:${recommendationMode}`;
+  const recommendationKey = `${deckCount}:${recommendationMode}${excludeUsedCards ? ":unused" : ""}`;
 
   const pollForRecommendation = useCallback(
     async (requestId: number): Promise<Recommendation> => {
@@ -106,6 +131,7 @@ export default function PlayerRecommendations() {
   );
 
   const loadRecommendations = useCallback(async (preserveExisting = false) => {
+    if (!deckCountReadyRef.current) return;
     const requestId = ++recommendationRequestRef.current;
     if (!recommendationsInitializedRef.current) {
       setRecommendationsLoading(true);
@@ -113,7 +139,18 @@ export default function PlayerRecommendations() {
     try {
       let recommendation: Recommendation;
       try {
-        recommendation = await api.recommendation(
+        // Excluding used cards always goes through the custom endpoint. A used
+        // Mirror Force / Team Tactics can't also be required, so drop that flag.
+        recommendation = excludeUsedCards
+          ? await api.customRecommendation(
+              playerId,
+              deckCount,
+              usedCycleCards,
+              mustIncludeMirrorForce && !usedCycleCards.includes("MirrorForce"),
+              mustIncludeTeamTactics && !usedCycleCards.includes("TeamTactics"),
+              includeBodyPhase,
+            )
+          : await api.recommendation(
           playerId,
           deckCount,
           mustIncludeMirrorForce,
@@ -121,7 +158,9 @@ export default function PlayerRecommendations() {
           includeBodyPhase,
         );
       } catch (error) {
-        if (!(error instanceof ApiError) || error.status !== 404) {
+        // The custom endpoint has nothing to fall back to: a 404 there isn't
+        // fixed by generating the default recommendations, so surface it.
+        if (excludeUsedCards || !(error instanceof ApiError) || error.status !== 404) {
           throw error;
         }
         if (recommendationRequestRef.current !== requestId) return;
@@ -176,7 +215,7 @@ export default function PlayerRecommendations() {
         setGeneratingRecommendation(false);
       }
     }
-  }, [deckCount, includeBodyPhase, mustIncludeMirrorForce, mustIncludeTeamTactics, playerId, recommendationKey, pollForRecommendation]);
+  }, [deckCount, excludeUsedCards, includeBodyPhase, mustIncludeMirrorForce, mustIncludeTeamTactics, playerId, recommendationKey, pollForRecommendation, usedCycleCards]);
 
   const refreshCurrentData = useCallback(async () => {
     setRefreshing(true);
@@ -275,21 +314,32 @@ export default function PlayerRecommendations() {
       setRecommendationsLoading(true);
       setAttackLogLoading(true);
       setAttackLogError("");
+      deckCountReadyRef.current = false;
+      setDeckCountReady(false);
     });
     Promise.allSettled([
       api.player(playerId),
       api.simsBoss(),
       api.cards(),
       api.playerAttackLog(playerId),
-    ]).then(([playerResult, bossResult, cardsResult, attackLogResult]) => {
+      api.cycleAttackSummary(),
+    ]).then(([playerResult, bossResult, cardsResult, attackLogResult, cycleResult]) => {
       if (!active) return;
       if (playerResult.status === "fulfilled") setPlayer(playerResult.value);
       else setPageError(errorMessage(playerResult.reason, "Could not load this player."));
       if (bossResult.status === "fulfilled") setBoss(bossResult.value);
       else setBossError(errorMessage(bossResult.reason, "No sims boss data is available."));
       if (cardsResult.status === "fulfilled") setCards(cardsResult.value);
-      if (attackLogResult.status === "fulfilled") setAttackLog(attackLogResult.value);
-      else setAttackLogError(errorMessage(attackLogResult.reason, "Could not load the attack log."));
+      const cycle = cycleResult.status === "fulfilled" ? cycleResult.value.cycle : null;
+      setCurrentCycle(cycle);
+      if (attackLogResult.status === "fulfilled") {
+        setAttackLog(attackLogResult.value);
+        setDeckCount(defaultDeckCountFor(attacksThisCycle(attackLogResult.value, cycle)));
+      } else {
+        setAttackLogError(errorMessage(attackLogResult.reason, "Could not load the attack log."));
+      }
+      deckCountReadyRef.current = true;
+      setDeckCountReady(true);
       setLoading(false);
       setAttackLogLoading(false);
     });
@@ -301,12 +351,12 @@ export default function PlayerRecommendations() {
   useEffect(() => {
     let active = true;
     void Promise.resolve().then(() => {
-      if (active) void loadRecommendations();
+      if (active && deckCountReady) void loadRecommendations();
     });
     return () => {
       active = false;
     };
-  }, [loadRecommendations]);
+  }, [loadRecommendations, deckCountReady]);
 
   usePolling({
     enabled: Boolean(playerId) && (!jobsReady || isActiveJob(latestJob)),
@@ -499,6 +549,14 @@ export default function PlayerRecommendations() {
                 />
                 <span>Must include Team Tactics</span>
               </label>
+              <label className="required-cards-toggle">
+                <input
+                  type="checkbox"
+                  checked={excludeUsedCards}
+                  onChange={(event) => setExcludeUsedCards(event.target.checked)}
+                />
+                <span>Do not include cards already used this cycle</span>
+              </label>
               <label className="deck-count-control">
                 <span>Number of decks</span>
                 <select
@@ -547,6 +605,7 @@ export default function PlayerRecommendations() {
           </div>
           <AttackLog
             entries={attackLog}
+            currentCycle={currentCycle}
             cards={cards}
             recommendedDecks={(customRecommendation ?? recommendations[recommendationKey])?.decks ?? []}
             damageMultiplier={damageMultiplier}

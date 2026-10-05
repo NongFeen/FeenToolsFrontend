@@ -170,6 +170,9 @@ interface Props {
   damageMultiplier: number;
   loading: boolean;
   error: string;
+  // The clan's current TT2 cycle. A player may have no attacks in it yet, so
+  // it can't be inferred from this player's own entries.
+  currentCycle: number | null;
 }
 
 export default function AttackLog({
@@ -179,6 +182,7 @@ export default function AttackLog({
   damageMultiplier,
   loading,
   error,
+  currentCycle,
 }: Props) {
   if (loading) return <div className="empty-state">Loading attack log…</div>;
   if (error) return <div className="error-box">{error}</div>;
@@ -188,9 +192,8 @@ export default function AttackLog({
 
   const definitions = new Map(cards.map((card) => [normalizeCardKey(card.id), card] as const));
   const simBenchmarkLookup = buildSimBenchmarkLookup(recommendedDecks, damageMultiplier);
-  const maxCycle = entries.reduce((max, entry) => Math.max(max, entry.cycle), entries[0].cycle);
   const currentCycleEntries = entries
-    .filter((entry) => entry.cycle === maxCycle)
+    .filter((entry) => entry.cycle === currentCycle)
     .sort((a, b) => {
       const diff = toBigInt(b.total_damage) - toBigInt(a.total_damage);
       return diff > 0n ? 1 : diff < 0n ? -1 : 0;
@@ -200,7 +203,7 @@ export default function AttackLog({
   return (
     <div className="attack-log">
       <div className="attack-log-section">
-        <h3 className="attack-log-subtitle">Current cycle (cycle {maxCycle})</h3>
+        <h3 className="attack-log-subtitle">Current cycle (cycle {currentCycle ?? "—"})</h3>
         <p className="panel-desc">
           Decks this player has actually attacked with this cycle, compared to the sim recommendations above.
         </p>

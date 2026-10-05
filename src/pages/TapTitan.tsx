@@ -8,6 +8,7 @@ import type {
   PlayerAttackLogEntry,
   PlayerSummary,
   RaidCycle,
+  RecommendedDeck,
   Recommendation,
 } from "../api/types";
 import Navbar from "../components/Navbar";
@@ -171,13 +172,15 @@ interface AttackedDecksState {
   decks?: AttackedDeck[];
 }
 
-// The attack log covers the whole raid, so keep only the latest TT2 cycle,
-// earliest attack first.
-const currentCycleDecks = (entries: PlayerAttackLogEntry[]): AttackedDeck[] => {
-  if (entries.length === 0) return [];
-  const latestCycle = Math.max(...entries.map((entry) => entry.cycle));
+// Keeps only the clan's current TT2 cycle, earliest attack first. Not the
+// player's latest entries: a player with no attacks yet this cycle has only
+// older ones, which would wrongly count as used.
+const currentCycleDecks = (
+  entries: PlayerAttackLogEntry[],
+  cycle: number | null,
+): AttackedDeck[] => {
   return entries
-    .filter((entry) => entry.cycle === latestCycle)
+    .filter((entry) => entry.cycle === cycle)
     .map((entry) => ({
       attackDatetime: entry.attack_datetime,
       cards: [entry.card1, entry.card2, entry.card3].filter(
@@ -235,6 +238,9 @@ export default function TapTitan() {
   >({});
   const [cycleAttacks, setCycleAttacks] = useState<
     Record<string, CyclePlayerAttacks>
+  >({});
+  const [remainingBest, setRemainingBest] = useState<
+    Record<string, { loading?: boolean; error?: string; decks?: RecommendedDeck[] }>
   >({});
   const [clanRecommendations, setClanRecommendations] = useState<
     Record<string, PlayerRecommendationModes>
@@ -494,6 +500,47 @@ export default function TapTitan() {
     return () => window.clearInterval(intervalId);
   }, []);
 
+  // Best decks for the attacks still left, with the used cards excluded on the
+  // backend (same endpoint as the re-recommend modal).
+  const loadRemainingBest = (
+    playerId: string,
+    usedCards: string[],
+    remaining: number,
+  ) => {
+    if (remaining <= 0) return;
+    // A used Mirror Force / Team Tactics is also excluded, so it can't be
+    // required too -- that combination has no deck to return.
+    const isUsed = (cardId: string) =>
+      usedCards.some((used) => normalizeCardKey(used) === cardId);
+    setRemainingBest((current) => ({ ...current, [playerId]: { loading: true } }));
+    api
+      .customRecommendation(
+        playerId,
+        remaining,
+        usedCards,
+        !isUsed("mirrorforce"),
+        !isUsed("teamtactics"),
+        false,
+      )
+      .then((recommendation) =>
+        setRemainingBest((current) => ({
+          ...current,
+          [playerId]: { decks: recommendation.decks },
+        })),
+      )
+      .catch((reason) =>
+        setRemainingBest((current) => ({
+          ...current,
+          [playerId]: {
+            error:
+              reason instanceof ApiError
+                ? reason.message
+                : "Could not load decks.",
+          },
+        })),
+      );
+  };
+
   // Fetched on every hover rather than cached, since the attacks change during
   // a cycle. The request guard only stops duplicate in-flight requests.
   const loadAttackedDecks = (player: PlayerSummary) => {
@@ -508,15 +555,19 @@ export default function TapTitan() {
     }));
     api
       .playerAttackLog(player.player_id)
-      .then((entries) =>
+      .then((entries) => {
+        const decks = currentCycleDecks(entries, cycleAttackSummary?.cycle ?? null);
         setAttackedDecks((current) => ({
           ...current,
-          [player.player_id]: {
-            loading: false,
-            decks: currentCycleDecks(entries),
-          },
-        })),
-      )
+          [player.player_id]: { loading: false, decks },
+        }));
+        const usedCards = [...new Set(decks.flatMap((deck) => deck.cards))];
+        loadRemainingBest(
+          player.player_id,
+          usedCards,
+          ATTACKS_PER_PLAYER_PER_CYCLE - decks.length,
+        );
+      })
       .catch((reason) =>
         setAttackedDecks((current) => ({
           ...current,
@@ -557,6 +608,43 @@ export default function TapTitan() {
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     previewTimerRef.current = null;
   };
+
+  // The cycle's six attacks: decks already used (earliest first), then the
+  // best decks for the attacks still left, computed without the used cards.
+  const usedCycleDecks = (playerId: string) =>
+    attackedDecks[playerId]?.decks ?? [];
+  const remainingBestDecks = (playerId: string) =>
+    (remainingBest[playerId]?.decks ?? []).slice(
+      0,
+      Math.max(0, ATTACKS_PER_PLAYER_PER_CYCLE - usedCycleDecks(playerId).length),
+    );
+
+  // Card images for one deck, shared by the best-deck and attacked-deck lists.
+  const renderDeckCards = (cardIds: string[]) => (
+    <span className="preview-deck-cards">
+      {cardIds.map((cardId) => {
+        const definition = cardDefinitions.get(normalizeCardKey(cardId));
+        const cardName = definition?.name ?? readableCardName(cardId);
+        return (
+          <span className="preview-card-slot" key={cardId}>
+            <span className="preview-card-image">
+              {definition ? (
+                <img
+                  src={assetUrl(cardImagePath(cardId))}
+                  alt={cardName}
+                  title={cardName}
+                />
+              ) : (
+                <span role="img" aria-label={`${cardName} image unavailable`}>
+                  ?
+                </span>
+              )}
+            </span>
+          </span>
+        );
+      })}
+    </span>
+  );
 
   return (
     <div className="page">
@@ -815,58 +903,68 @@ export default function TapTitan() {
                   role="status"
                   style={{ maxHeight: previewLayout.maxHeight }}
                 >
-                  <strong>Attacked this cycle</strong>
-                  <small>
-                    {cycleAttacks[player.player_id]?.attack_count ?? 0} of{" "}
-                    {ATTACKS_PER_PLAYER_PER_CYCLE} attacks
-                  </small>
-                  {attackedDecks[player.player_id]?.loading && (
-                    <p>Loading attacks…</p>
-                  )}
-                  {attackedDecks[player.player_id]?.error && (
-                    <p>{attackedDecks[player.player_id].error}</p>
-                  )}
-                  {attackedDecks[player.player_id]?.decks?.length === 0 && (
-                    <p>No attacks this cycle yet.</p>
-                  )}
-                  {(attackedDecks[player.player_id]?.decks?.length ?? 0) > 0 && (
-                    <ol>
-                      {attackedDecks[player.player_id].decks!.map(
-                        (deck, index) => (
-                          <li key={`${deck.attackDatetime}-${index}`}>
-                            <span className="preview-deck-cards">
-                              {deck.cards.map((cardId) => {
-                                const definition = cardDefinitions.get(
-                                  normalizeCardKey(cardId),
-                                );
-                                const cardName =
-                                  definition?.name ?? readableCardName(cardId);
-                                return (
-                                  <span className="preview-card-slot" key={cardId}>
-                                    <span className="preview-card-image">
-                                      {definition ? (
-                                        <img
-                                          src={assetUrl(cardImagePath(cardId))}
-                                          alt={cardName}
-                                          title={cardName}
-                                        />
-                                      ) : (
-                                        <span
-                                          role="img"
-                                          aria-label={`${cardName} image unavailable`}
-                                        >
-                                          ?
-                                        </span>
-                                      )}
-                                    </span>
-                                  </span>
-                                );
-                              })}
-                            </span>
-                          </li>
-                        ),
+                  {cycleAttacks[player.player_id]?.finished ? (
+                    <>
+                      <strong>Attacked this cycle</strong>
+                      <small>
+                        {ATTACKS_PER_PLAYER_PER_CYCLE} of{" "}
+                        {ATTACKS_PER_PLAYER_PER_CYCLE} attacks used
+                      </small>
+                      {attackedDecks[player.player_id]?.loading && (
+                        <p>Loading attacks…</p>
                       )}
-                    </ol>
+                      {attackedDecks[player.player_id]?.error && (
+                        <p>{attackedDecks[player.player_id].error}</p>
+                      )}
+                      <ol>
+                        {(attackedDecks[player.player_id]?.decks ?? []).map(
+                          (deck, index) => (
+                            <li key={`${deck.attackDatetime}-${index}`}>
+                              {renderDeckCards(deck.cards)}
+                            </li>
+                          ),
+                        )}
+                      </ol>
+                    </>
+                  ) : (
+                    <>
+                      <strong>Best raid deck</strong>
+                      <small>
+                        {usedCycleDecks(player.player_id).length} of{" "}
+                        {ATTACKS_PER_PLAYER_PER_CYCLE} attacks used
+                      </small>
+                      {attackedDecks[player.player_id]?.loading && (
+                        <p>Loading attacks…</p>
+                      )}
+                      {remainingBest[player.player_id]?.loading && (
+                        <p>Loading decks…</p>
+                      )}
+                      {remainingBest[player.player_id]?.error && (
+                        <p>{remainingBest[player.player_id].error}</p>
+                      )}
+                      {remainingBest[player.player_id]?.decks?.length === 0 && (
+                        <p>No deck found without the used cards.</p>
+                      )}
+                      <ol>
+                        {usedCycleDecks(player.player_id).map((deck, index) => (
+                          <li
+                            className="preview-deck-used"
+                            key={`used-${deck.attackDatetime}-${index}`}
+                          >
+                            {renderDeckCards(deck.cards)}
+                          </li>
+                        ))}
+                        {remainingBestDecks(player.player_id).map((deck, index) => (
+                          <li key={`best-${deck.position}-${index}`}>
+                            {renderDeckCards(
+                              deck.cards?.length
+                                ? deck.cards
+                                : (deck.result?.deck ?? []),
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    </>
                   )}
                 </div>
               )}
