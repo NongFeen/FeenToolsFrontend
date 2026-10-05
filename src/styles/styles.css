@@ -18,6 +18,8 @@
   --accent-light: #f5ede8;
   --success: #24734c;
   --success-light: #eef8f2;
+  --gold: #c9a227;
+  --gold-light: #fbf5dc;
   --info-light: #f0f5f8;
   --radius: 6px;
   --transition: 180ms ease;
@@ -602,10 +604,12 @@ button:disabled {
   border-color: var(--success);
   background: var(--success-light);
 }
-/* Player has used all of their attacks this cycle. */
-.player-option-cycle-done {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+/* Player has used all of their attacks this cycle. Written as a compound
+   selector so it overrides `.player-option-has-data`'s green. */
+.player-option.player-option-cycle-done {
+  border-color: var(--gold);
+  background: var(--gold-light);
+  box-shadow: 0 0 0 1px var(--gold);
 }
 .cycle-attack-badge {
   display: block;
@@ -614,7 +618,7 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 .player-option-cycle-done .cycle-attack-badge {
-  color: var(--accent);
+  color: #8a6d12;
   font-weight: 600;
 }
 .player-option h2 {
