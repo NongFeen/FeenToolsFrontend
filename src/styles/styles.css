@@ -602,6 +602,21 @@ button:disabled {
   border-color: var(--success);
   background: var(--success-light);
 }
+/* Player has used all of their attacks this cycle. */
+.player-option-cycle-done {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.cycle-attack-badge {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.player-option-cycle-done .cycle-attack-badge {
+  color: var(--accent);
+  font-weight: 600;
+}
 .player-option h2 {
   font-size: 0.95rem;
 }

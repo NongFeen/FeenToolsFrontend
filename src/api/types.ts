@@ -27,6 +27,12 @@ export interface PlayerDetail extends PlayerSummary {
   stats: PlayerRaidData | null;
 }
 
+export interface CyclePlayerAttacks {
+  player_id: string;
+  attack_count: number;
+  finished: boolean;
+}
+
 export interface PlayerAttackLogEntry {
   cycle: number;
   attack_datetime: string;
