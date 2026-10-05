@@ -6,6 +6,7 @@ import type {
   HealthResponse,
   LiveAttackingPlayer,
   LiveCurrentBoss,
+  CyclePlayerAttacks,
   PlayerAttackLogEntry,
   PlayerDetail,
   PlayerRaidData,
@@ -109,6 +110,8 @@ export const api = {
   cycleAttackSummary: () =>
     request<CycleAttackSummary>("/api/raid-cycle/current/attack-summary"),
   simulationQueue: () => request<SimulationQueue>("/api/simulation-queue"),
+  raidCyclePlayerAttacks: () =>
+    request<CyclePlayerAttacks[]>("/api/raid-cycle/current/player-attacks"),
   recommendation: (
     playerId: string,
     deckCount: number,

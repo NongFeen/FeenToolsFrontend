@@ -4,6 +4,8 @@ import { api, ApiError, assetUrl, cardImagePath } from "../api/client";
 import type {
   CardDefinition,
   CycleAttackSummary,
+  CyclePlayerAttacks,
+  PlayerAttackLogEntry,
   PlayerSummary,
   RaidCycle,
   Recommendation,
@@ -11,13 +13,6 @@ import type {
 import Navbar from "../components/Navbar";
 import RaidResetCountdown from "../components/RaidResetCountdown";
 import SimulationQueueWidget, { useSimulationQueue } from "../components/SimulationQueueWidget";
-
-interface DeckPreview {
-  loading: boolean;
-  recommendation?: Recommendation;
-  cardLevels?: Record<string, number>;
-  error?: string;
-}
 
 interface PlayerRecommendationModes {
   current: Recommendation | null;
@@ -165,6 +160,36 @@ const summarizeRecommendations = (
 // denominator for the clan-wide "attacks used" ratio.
 const ATTACKS_PER_PLAYER_PER_CYCLE = 6;
 
+interface AttackedDeck {
+  attackDatetime: string;
+  cards: string[];
+}
+
+interface AttackedDecksState {
+  loading?: boolean;
+  error?: string;
+  decks?: AttackedDeck[];
+}
+
+// The attack log covers the whole raid, so keep only the latest TT2 cycle,
+// earliest attack first.
+const currentCycleDecks = (entries: PlayerAttackLogEntry[]): AttackedDeck[] => {
+  if (entries.length === 0) return [];
+  const latestCycle = Math.max(...entries.map((entry) => entry.cycle));
+  return entries
+    .filter((entry) => entry.cycle === latestCycle)
+    .map((entry) => ({
+      attackDatetime: entry.attack_datetime,
+      cards: [entry.card1, entry.card2, entry.card3].filter(
+        (cardId): cardId is string => Boolean(cardId),
+      ),
+    }))
+    .sort(
+      (left, right) =>
+        Date.parse(left.attackDatetime) - Date.parse(right.attackDatetime),
+    );
+};
+
 const readableCardName = (cardId: string) =>
   cardId.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
 const normalizeCardKey = (cardId: string) =>
@@ -215,9 +240,12 @@ export default function TapTitan() {
     placement: "below",
     maxHeight: 480,
   });
-  const [deckPreviews, setDeckPreviews] = useState<Record<string, DeckPreview>>(
-    {},
-  );
+  const [attackedDecks, setAttackedDecks] = useState<
+    Record<string, AttackedDecksState>
+  >({});
+  const [cycleAttacks, setCycleAttacks] = useState<
+    Record<string, CyclePlayerAttacks>
+  >({});
   const [clanRecommendations, setClanRecommendations] = useState<
     Record<string, PlayerRecommendationModes>
   >({});
@@ -461,92 +489,57 @@ export default function TapTitan() {
     [],
   );
 
-  const loadDeckPreview = (player: PlayerSummary) => {
-    if (
-      previewRequestsRef.current.has(player.player_id) ||
-      deckPreviews[player.player_id]?.recommendation ||
-      deckPreviews[player.player_id]?.loading
-    )
-      return;
+  useEffect(() => {
+    const loadCycleAttacks = () =>
+      api
+        .raidCyclePlayerAttacks()
+        .then((rows) =>
+          setCycleAttacks(
+            Object.fromEntries(rows.map((row) => [row.player_id, row])),
+          ),
+        )
+        .catch(() => undefined);
+    void loadCycleAttacks();
+    const intervalId = window.setInterval(loadCycleAttacks, 15_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  // Fetched on every hover rather than cached, since the attacks change during
+  // a cycle. The request guard only stops duplicate in-flight requests.
+  const loadAttackedDecks = (player: PlayerSummary) => {
+    if (previewRequestsRef.current.has(player.player_id)) return;
     previewRequestsRef.current.add(player.player_id);
-    setDeckPreviews((current) => ({
+    setAttackedDecks((current) => ({
       ...current,
-      [player.player_id]: { loading: true },
+      [player.player_id]: {
+        loading: true,
+        decks: current[player.player_id]?.decks,
+      },
     }));
-    const loadedModes = clanRecommendations[player.player_id];
-    const recommendationPromise = loadedModes
-      ? Promise.resolve(loadedModes.combined ?? loadedModes.current)
-      : loadRecommendationOrNull(player.player_id, true).then(
-          (combined) =>
-            combined ?? loadRecommendationOrNull(player.player_id, false),
-        );
-    Promise.all([
-      recommendationPromise,
-      api.player(player.player_id).catch(() => null),
-    ])
-      .then(([recommendation, detail]) =>
-        setDeckPreviews((current) => ({
+    api
+      .playerAttackLog(player.player_id)
+      .then((entries) =>
+        setAttackedDecks((current) => ({
           ...current,
-          [player.player_id]: recommendation
-            ? {
-                loading: false,
-                recommendation,
-                cardLevels: Object.fromEntries(
-                  (detail?.stats?.card_list ?? []).map((card) => [
-                    normalizeCardKey(card.card_id),
-                    card.level,
-                  ]),
-                ),
-              }
-            : {
-                loading: false,
-                error: "No six-deck recommendation is ready.",
-              },
+          [player.player_id]: {
+            loading: false,
+            decks: currentCycleDecks(entries),
+          },
         })),
       )
       .catch((reason) =>
-        setDeckPreviews((current) => ({
+        setAttackedDecks((current) => ({
           ...current,
           [player.player_id]: {
             loading: false,
             error:
-              reason instanceof ApiError && reason.status === 404
-                ? "No six-deck recommendation is ready."
-                : reason instanceof ApiError
-                  ? reason.message
-                  : "Could not load deck preview.",
+              reason instanceof ApiError
+                ? reason.message
+                : "Could not load attacks.",
           },
         })),
-      );
-  };
-
-  const playersInPreviewRange = (
-    player: PlayerSummary,
-    anchor: HTMLElement,
-  ) => {
-    const grid = anchor.parentElement;
-    const currentIndex = filteredPlayers.findIndex(
-      (candidate) => candidate.player_id === player.player_id,
-    );
-    if (!grid || currentIndex < 0) return [player];
-    const templateColumns = window.getComputedStyle(grid).gridTemplateColumns;
-    const columnCount = Math.max(
-      1,
-      templateColumns.trim().split(/\s+/).filter(Boolean).length,
-    );
-    const currentRow = Math.floor(currentIndex / columnCount);
-    const currentColumn = currentIndex % columnCount;
-    const nearby = new Set<number>();
-    for (let rowOffset = -2; rowOffset <= 2; rowOffset += 1) {
-      for (let columnOffset = -2; columnOffset <= 2; columnOffset += 1) {
-        const row = currentRow + rowOffset;
-        const column = currentColumn + columnOffset;
-        if (row < 0 || column < 0 || column >= columnCount) continue;
-        const index = row * columnCount + column;
-        if (index < filteredPlayers.length) nearby.add(index);
-      }
-    }
-    return [...nearby].map((index) => filteredPlayers[index]);
+      )
+      .finally(() => previewRequestsRef.current.delete(player.player_id));
   };
 
   const beginDeckPreview = (player: PlayerSummary, anchor: HTMLElement) => {
@@ -565,7 +558,7 @@ export default function TapTitan() {
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
 
     previewTimerRef.current = setTimeout(() => {
-      playersInPreviewRange(player, anchor).forEach(loadDeckPreview);
+      loadAttackedDecks(player);
     }, 300);
   };
 
@@ -803,7 +796,7 @@ export default function TapTitan() {
             );
             return (
             <Link
-              className={`player-option${hasRecommendationData ? " player-option-has-data" : ""}`}
+              className={`player-option${hasRecommendationData ? " player-option-has-data" : ""}${cycleAttacks[player.player_id]?.finished ? " player-option-cycle-done" : ""}`}
               key={player.player_id}
               to={`/tools/taptitan/players/${encodeURIComponent(player.player_id)}`}
               onMouseEnter={(event) =>
@@ -816,6 +809,12 @@ export default function TapTitan() {
               <div>
                 <h2>{player.display_name}</h2>
                 <p>{player.player_id}</p>
+                {cycleAttacks[player.player_id] && (
+                  <small className="cycle-attack-badge">
+                    {cycleAttacks[player.player_id].attack_count}/
+                    {ATTACKS_PER_PLAYER_PER_CYCLE} attacks this cycle
+                  </small>
+                )}
               </div>
               <span className="arrow" aria-hidden="true">
                 →
@@ -826,109 +825,58 @@ export default function TapTitan() {
                   role="status"
                   style={{ maxHeight: previewLayout.maxHeight }}
                 >
-                  <strong>Best 6 decks</strong>
-                  <small>Mirror Force + Team Tactics</small>
-                  {!deckPreviews[player.player_id] && <p>Loading preview…</p>}
-                  {deckPreviews[player.player_id]?.loading && (
-                    <p>Loading preview…</p>
+                  <strong>Attacked this cycle</strong>
+                  <small>
+                    {cycleAttacks[player.player_id]?.attack_count ?? 0} of{" "}
+                    {ATTACKS_PER_PLAYER_PER_CYCLE} attacks
+                  </small>
+                  {attackedDecks[player.player_id]?.loading && (
+                    <p>Loading attacks…</p>
                   )}
-                  {deckPreviews[player.player_id]?.error && (
-                    <p>{deckPreviews[player.player_id].error}</p>
+                  {attackedDecks[player.player_id]?.error && (
+                    <p>{attackedDecks[player.player_id].error}</p>
                   )}
-                  {deckPreviews[player.player_id]?.recommendation && (
-                    <>
-                      <small className="preview-total-damage">
-                        Total avg dmg:{" "}
-                        {formatDamage(
-                          deckPreviews[player.player_id]!.recommendation!
-                            .total_average_damage,
-                          damageMultiplier,
-                        )}
-                      </small>
-                      <ol>
-                        {[
-                          ...deckPreviews[player.player_id]!.recommendation!
-                            .decks,
-                        ]
-                          .sort((left, right) => left.position - right.position)
-                          .slice(0, 6)
-                          .map((deck, index) => {
-                            const cards = deck.cards?.length
-                              ? deck.cards
-                              : (deck.result?.deck ?? []);
-                            return (
-                              <li key={`${deck.position}-${index}`}>
-                                <span className="preview-deck-cards">
-                                  {cards.slice(0, 3).map((cardId) => {
-                                    const definition = cardDefinitions.get(
-                                      normalizeCardKey(cardId),
-                                    );
-                                    const cardName =
-                                      definition?.name ??
-                                      readableCardName(cardId);
-                                    const level =
-                                      deckPreviews[player.player_id]
-                                        ?.cardLevels?.[
-                                        normalizeCardKey(cardId)
-                                      ];
-                                    const cardDamage =
-                                      deck.result?.best_pattern?.card_damage?.find(
-                                        (entry) =>
-                                          normalizeCardKey(entry.card) ===
-                                          normalizeCardKey(cardId),
-                                      );
-                                    return (
-                                      <span
-                                        className="preview-card-slot"
-                                        key={cardId}
-                                      >
-                                        <span className="preview-card-image">
-                                          {definition ? (
-                                            <img
-                                              src={assetUrl(cardImagePath(cardId))}
-                                              alt={cardName}
-                                              title={cardName}
-                                            />
-                                          ) : (
-                                            <span
-                                              role="img"
-                                              aria-label={`${cardName} image unavailable`}
-                                            >
-                                              ?
-                                            </span>
-                                          )}
-                                          {level !== undefined && (
-                                            <small className="card-level-badge">
-                                              Lv {level}
-                                              {Boolean(
-                                                definition?.seasonal_level_boost,
-                                              ) && (
-                                                <span className="seasonal-level-inline">
-                                                  +
-                                                  {
-                                                    definition!
-                                                      .seasonal_level_boost
-                                                  }
-                                                </span>
-                                              )}
-                                            </small>
-                                          )}
+                  {attackedDecks[player.player_id]?.decks?.length === 0 && (
+                    <p>No attacks this cycle yet.</p>
+                  )}
+                  {(attackedDecks[player.player_id]?.decks?.length ?? 0) > 0 && (
+                    <ol>
+                      {attackedDecks[player.player_id].decks!.map(
+                        (deck, index) => (
+                          <li key={`${deck.attackDatetime}-${index}`}>
+                            <span className="preview-deck-cards">
+                              {deck.cards.map((cardId) => {
+                                const definition = cardDefinitions.get(
+                                  normalizeCardKey(cardId),
+                                );
+                                const cardName =
+                                  definition?.name ?? readableCardName(cardId);
+                                return (
+                                  <span className="preview-card-slot" key={cardId}>
+                                    <span className="preview-card-image">
+                                      {definition ? (
+                                        <img
+                                          src={assetUrl(cardImagePath(cardId))}
+                                          alt={cardName}
+                                          title={cardName}
+                                        />
+                                      ) : (
+                                        <span
+                                          role="img"
+                                          aria-label={`${cardName} image unavailable`}
+                                        >
+                                          ?
                                         </span>
-                                        <small className="card-damage-label">
-                                          {formatCompactDamage(
-                                            cardDamage?.average_damage,
-                                            damageMultiplier,
-                                          )}
-                                        </small>
-                                      </span>
-                                    );
-                                  })}
-                                </span>
-                              </li>
-                            );
-                          })}
-                      </ol>
-                    </>
+                                      )}
+                                    </span>
+                                  </span>
+                                );
+                              })}
+                            </span>
+                          </li>
+                        ),
+                      )}
+                    </ol>
                   )}
                 </div>
               )}
