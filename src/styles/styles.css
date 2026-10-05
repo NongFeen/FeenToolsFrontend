@@ -617,6 +617,11 @@ button:disabled {
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
 }
+/* Decks this player already attacked with this cycle, in the hover list. */
+.preview-deck-used {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
 .player-option-cycle-done .cycle-attack-badge {
   color: #8a6d12;
   font-weight: 600;
