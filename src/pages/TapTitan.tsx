@@ -196,16 +196,6 @@ const normalizeCardKey = (cardId: string) =>
   cardId.toLocaleLowerCase().replace(/[^a-z0-9]/g, "");
 const clampPercent = (value: number, maximum: number) =>
   Number.isFinite(value) ? Math.min(maximum, Math.max(0, value)) : 0;
-const formatDamage = (value: string, multiplier = 1) => {
-  try {
-    const wholeDamage = BigInt(value.split(".")[0]);
-    const scale = 1_000_000n;
-    const scaledMultiplier = BigInt(Math.round(multiplier * Number(scale)));
-    return ((wholeDamage * scaledMultiplier) / scale).toLocaleString();
-  } catch {
-    return value;
-  }
-};
 const formatCompactDamage = (
   value: string | number | undefined,
   multiplier = 1,
