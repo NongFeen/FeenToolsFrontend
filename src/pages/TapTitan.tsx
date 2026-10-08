@@ -166,6 +166,24 @@ interface AttackedDeck {
   cards: string[];
 }
 
+// Fixed display order for the known card types; anything else (shouldn't
+// happen, but a card definition could be missing one) falls into "Other" last.
+const CARD_TYPE_ORDER = ["Burst", "Affliction", "Support"];
+
+function groupCardsByType(cards: CardDefinition[]) {
+  const groups = new Map<string, CardDefinition[]>();
+  for (const card of cards) {
+    const group = groups.get(card.type);
+    if (group) group.push(card);
+    else groups.set(card.type, [card]);
+  }
+  const orderedTypes = [
+    ...CARD_TYPE_ORDER.filter((type) => groups.has(type)),
+    ...[...groups.keys()].filter((type) => !CARD_TYPE_ORDER.includes(type)),
+  ];
+  return orderedTypes.map((type) => ({ type, cards: groups.get(type) ?? [] }));
+}
+
 interface AttackedDecksState {
   loading?: boolean;
   error?: string;
@@ -476,6 +494,11 @@ export default function TapTitan() {
 
   const cardDefinitions = new Map(
     cards.map((card) => [normalizeCardKey(card.id), card] as const),
+  );
+  const cardUsesByKey = new Map(
+    (cycleAttackSummary?.card_usage ?? []).map(
+      (usage) => [normalizeCardKey(usage.card_id), usage.uses] as const,
+    ),
   );
 
   useEffect(
@@ -799,41 +822,41 @@ export default function TapTitan() {
                   </strong>
                 </div>
               </div>
-              {cycleAttackSummary.card_usage.length > 0 && (
+              {cards.length > 0 && (
                 <div className="cycle-card-usage">
                   <h3 className="attack-log-subtitle">Card usage this cycle</h3>
-                  <div className="cycle-card-usage-grid">
-                    {cycleAttackSummary.card_usage.map((usage) => {
-                      const definition = cardDefinitions.get(
-                        normalizeCardKey(usage.card_id),
-                      );
-                      const displayName =
-                        definition?.name ?? readableCardName(usage.card_id);
-                      return (
-                        <div className="cycle-card-usage-item" key={usage.card_id}>
-                          <span className="card-art-wrap">
-                            {definition ? (
-                              <img
-                                src={assetUrl(cardImagePath(usage.card_id))}
-                                alt={displayName}
-                                title={displayName}
-                                loading="lazy"
-                              />
-                            ) : (
-                              <span
-                                className="deck-image-missing"
-                                role="img"
-                                aria-label={`${displayName} image unavailable`}
-                              >
-                                Image unavailable
+                  {groupCardsByType(cards).map(({ type, cards: groupCards }) => (
+                    <div className="cycle-card-usage-group" key={type}>
+                      <h4 className="cycle-card-usage-group-title">{type}</h4>
+                      <div className="cycle-card-usage-grid">
+                        {[...groupCards]
+                          .sort(
+                            (a, b) =>
+                              (cardUsesByKey.get(normalizeCardKey(b.id)) ?? 0) -
+                              (cardUsesByKey.get(normalizeCardKey(a.id)) ?? 0),
+                          )
+                          .map((card) => {
+                          const uses = cardUsesByKey.get(normalizeCardKey(card.id)) ?? 0;
+                          return (
+                            <div
+                              className={`cycle-card-usage-item${uses === 0 ? " cycle-card-usage-item-unused" : ""}`}
+                              key={card.id}
+                            >
+                              <span className="card-art-wrap">
+                                <img
+                                  src={assetUrl(cardImagePath(card.id))}
+                                  alt={card.name}
+                                  title={card.name}
+                                  loading="lazy"
+                                />
                               </span>
-                            )}
-                          </span>
-                          <small>{usage.uses}×</small>
-                        </div>
-                      );
-                    })}
-                  </div>
+                              <small>{uses > 0 ? `${uses}×` : ""}</small>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </>

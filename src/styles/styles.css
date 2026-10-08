@@ -535,6 +535,18 @@ button:disabled {
 .cycle-summary-stats strong {
   font-size: 1.1rem;
 }
+.cycle-card-usage-group + .cycle-card-usage-group {
+  margin-top: 0.85rem;
+}
+.cycle-card-usage-group-title {
+  margin: 0 0 0.4rem;
+  color: var(--text-muted);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .cycle-card-usage-grid {
   display: flex;
   flex-wrap: wrap;
@@ -553,6 +565,14 @@ button:disabled {
 .cycle-card-usage-item small {
   color: var(--text-muted);
   font-size: 0.72rem;
+}
+/* Nobody has used this card this cycle. */
+.cycle-card-usage-item-unused .card-art-wrap {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+.cycle-card-usage-item-unused small {
+  opacity: 0.7;
 }
 .player-search {
   display: block;
