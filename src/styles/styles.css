@@ -16,10 +16,10 @@
   --accent: #c4572a;
   --accent-hover: #aa4821;
   --accent-light: #f5ede8;
-  --success: #24734c;
+  --success: #08c969;
   --success-light: #eef8f2;
   --gold: #c9a227;
-  --seasonal-boost: #e8891a;
+  --seasonal-boost: #e27f0d;
   --gold-light: #fbf5dc;
   --info-light: #f0f5f8;
   --radius: 6px;
@@ -576,12 +576,7 @@ button:disabled {
 .player-cards-top-grid {
   display: grid;
   grid-template-columns: repeat(3, 56px);
-}
-/* Room for the boost rings so neighbouring cards don't overlap. */
-.player-cards-top-grid,
-.player-cards-category .cycle-card-usage-grid {
-  gap: 1.2rem;
-  padding: 0.5rem;
+  gap: 0.7rem;
 }
 .player-card.player-card-crystal .card-art-wrap,
 .player-card.player-card-seasonal .card-art-wrap {
