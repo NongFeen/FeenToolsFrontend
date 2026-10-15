@@ -898,8 +898,14 @@ button:disabled {
 }
 .profile-facts {
   display: grid;
-  grid-template-columns: repeat(3, minmax(95px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(95px, auto);
   border-left: 1px solid var(--border);
+}
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 .profile-facts div {
   padding: 0.2rem 1.1rem;
@@ -2027,6 +2033,9 @@ input[aria-invalid="true"] {
     border-top: 1px solid var(--border);
     border-left: 0;
     padding-top: 1rem;
+  }
+  .profile-actions {
+    width: 100%;
   }
   .layout {
     flex-direction: column;
