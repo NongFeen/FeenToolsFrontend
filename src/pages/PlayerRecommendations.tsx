@@ -10,6 +10,7 @@ import type {
   SimulationJob,
 } from "../api/types";
 import AttackLog from "../components/AttackLog";
+import PlayerCards from "../components/PlayerCards";
 import JobStatus from "../components/JobStatus";
 import Navbar from "../components/Navbar";
 import RecommendationDecks from "../components/RecommendationDecks";
@@ -611,6 +612,23 @@ export default function PlayerRecommendations() {
             damageMultiplier={damageMultiplier}
             loading={attackLogLoading}
             error={attackLogError}
+          />
+        </section>
+
+        <section className="panel section-gap">
+          <div className="panel-heading-row">
+            <div>
+              <h2 className="panel-title">Player cards</h2>
+              <p className="panel-desc">
+                Card levels, highest first. Boosted cards have a green border; the green number is the
+                raid crystal boost plus the seasonal boost (hover a card for the breakdown).
+              </p>
+            </div>
+          </div>
+          <PlayerCards
+            playerCards={player?.stats?.card_list ?? []}
+            crystalBoosts={player?.stats?.raid_crystal_boosts ?? []}
+            cards={cards}
           />
         </section>
       </main>

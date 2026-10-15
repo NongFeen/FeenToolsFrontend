@@ -75,6 +75,14 @@ export interface PlayerRaidData {
   gem_stone_research: Record<string, number>;
   card_list: PlayerCard[];
   title: number;
+  // Cards raised by the raid crystal; card_list levels already include it.
+  raid_crystal_boosts?: RaidCrystalBoost[];
+}
+
+export interface RaidCrystalBoost {
+  card_id: string;
+  base_level: number;
+  boost_level: number;
 }
 
 export interface PlayerStatsVersion {
