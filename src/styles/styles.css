@@ -16,9 +16,10 @@
   --accent: #c4572a;
   --accent-hover: #aa4821;
   --accent-light: #f5ede8;
-  --success: #24734c;
+  --success: #08c969;
   --success-light: #eef8f2;
   --gold: #c9a227;
+  --seasonal-boost: #e27f0d;
   --gold-light: #fbf5dc;
   --info-light: #f0f5f8;
   --radius: 6px;
@@ -547,6 +548,56 @@ button:disabled {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+/* Player page card list: one box per category, each split into top 6 /
+   raid crystal / other. Boosted cards get a green frame and green "+N". */
+.player-cards-categories {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.player-cards-category {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.player-cards-section + .player-cards-section {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border);
+}
+.player-cards-section-title {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+.player-cards-top-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  gap: 0.7rem;
+}
+.player-card.player-card-crystal .card-art-wrap,
+.player-card.player-card-seasonal .card-art-wrap {
+  border-radius: 6px;
+}
+.player-card.player-card-crystal .card-art-wrap {
+  box-shadow: 0 0 0 4px var(--success);
+}
+.player-card.player-card-seasonal .card-art-wrap {
+  box-shadow: 0 0 0 4px var(--seasonal-boost);
+}
+/* Both boosts: green ring inside, orange ring outside. */
+.player-card.player-card-crystal.player-card-seasonal .card-art-wrap {
+  box-shadow:
+    0 0 0 4px var(--success),
+    0 0 0 8px var(--seasonal-boost);
+}
+.player-card-boost {
+  color: var(--success);
+  font-weight: 600;
+}
 .cycle-card-usage-grid {
   display: flex;
   flex-wrap: wrap;
@@ -847,8 +898,14 @@ button:disabled {
 }
 .profile-facts {
   display: grid;
-  grid-template-columns: repeat(3, minmax(95px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(95px, auto);
   border-left: 1px solid var(--border);
+}
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 .profile-facts div {
   padding: 0.2rem 1.1rem;
@@ -1976,6 +2033,9 @@ input[aria-invalid="true"] {
     border-top: 1px solid var(--border);
     border-left: 0;
     padding-top: 1rem;
+  }
+  .profile-actions {
+    width: 100%;
   }
   .layout {
     flex-direction: column;

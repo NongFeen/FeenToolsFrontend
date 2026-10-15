@@ -3,14 +3,13 @@ import { Link, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import type {
   CardDefinition,
-  CurrentBoss,
   PlayerAttackLogEntry,
   PlayerDetail,
   Recommendation,
   SimulationJob,
 } from "../api/types";
 import AttackLog from "../components/AttackLog";
-import JobStatus from "../components/JobStatus";
+import PlayerCards from "../components/PlayerCards";
 import Navbar from "../components/Navbar";
 import RecommendationDecks from "../components/RecommendationDecks";
 import ReRecommendModal from "../components/ReRecommendModal";
@@ -19,6 +18,21 @@ import { useRaidMoraleDefault } from "../hooks/useRaidMoraleDefault";
 import { isActiveJob } from "../utils/taptitan";
 
 const DEFAULT_DECK_COUNT = 6;
+const PLAYER_CARDS_SECTION_ID = "player-cards";
+// Animated here rather than with CSS smooth scrolling, which the stylesheet
+// turns off when the OS asks for reduced motion, making the button jump.
+const smoothScrollTo = (element: HTMLElement, durationMs = 600) => {
+  const start = window.scrollY;
+  const target = element.getBoundingClientRect().top + window.scrollY - 16;
+  const startTime = performance.now();
+  const step = (now: number) => {
+    const progress = Math.min(1, (now - startTime) / durationMs);
+    const eased = 1 - (1 - progress) ** 3;
+    window.scrollTo({ top: start + (target - start) * eased, behavior: "instant" });
+    if (progress < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+};
 const MAX_DECK_COUNT = 14;
 const deckCountOptions = Array.from(
   { length: MAX_DECK_COUNT },
@@ -42,7 +56,6 @@ const defaultDeckCountFor = (attacksDone: number) =>
 export default function PlayerRecommendations() {
   const { playerId = "" } = useParams();
   const [player, setPlayer] = useState<PlayerDetail | null>(null);
-  const [boss, setBoss] = useState<CurrentBoss | null>(null);
   const [cards, setCards] = useState<CardDefinition[]>([]);
   const [latestJob, setLatestJob] = useState<SimulationJob | null>(null);
   const [jobsReady, setJobsReady] = useState(false);
@@ -226,7 +239,6 @@ export default function PlayerRecommendations() {
     ]);
 
     if (bossResult.status === "fulfilled") {
-      setBoss(bossResult.value);
       setBossError("");
     } else {
       setRefreshError(errorMessage(bossResult.reason, "Could not refresh Sims Boss data."));
@@ -327,8 +339,9 @@ export default function PlayerRecommendations() {
       if (!active) return;
       if (playerResult.status === "fulfilled") setPlayer(playerResult.value);
       else setPageError(errorMessage(playerResult.reason, "Could not load this player."));
-      if (bossResult.status === "fulfilled") setBoss(bossResult.value);
-      else setBossError(errorMessage(bossResult.reason, "No sims boss data is available."));
+      if (bossResult.status === "rejected") {
+        setBossError(errorMessage(bossResult.reason, "No sims boss data is available."));
+      }
       if (cardsResult.status === "fulfilled") setCards(cardsResult.value);
       const cycle = cycleResult.status === "fulfilled" ? cycleResult.value.cycle : null;
       setCurrentCycle(cycle);
@@ -422,46 +435,41 @@ export default function PlayerRecommendations() {
             {player.display_name.slice(0, 1).toUpperCase()}
           </div>
           <div className="profile-main">
-            <span className="eyebrow">Player recommendation</span>
             <h1>{player.display_name}</h1>
             <p>{player.player_id}</p>
           </div>
           <dl className="profile-facts">
-            <div><dt>Stats revision</dt><dd>{player.stats_revision ?? "Missing"}</dd></div>
             <div><dt>Auto sims</dt><dd>{player.auto_sims ? "Enabled" : "Disabled"}</dd></div>
-            <div><dt>Sims boss</dt><dd>{boss?.boss_data.boss_name ?? "Missing"}</dd></div>
           </dl>
-        </header>
-
-        {!player.stats && (
-          <div className="notice-box">
-            This player has no current stats. Import and save stats in Admin before running a simulation.
-          </div>
-        )}
-        {bossError && <div className="notice-box">{bossError}</div>}
-        <section className="panel section-gap">
-          <div className="panel-heading-row simulation-status-heading">
-            <div>
-              <h2 className="panel-title">Simulation status</h2>
-              <p className="panel-desc">Refresh to check for a newly queued automatic simulation.</p>
-            </div>
+          <div className="profile-actions">
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => {
+                const section = document.getElementById(PLAYER_CARDS_SECTION_ID);
+                if (section) smoothScrollTo(section);
+              }}
+            >
+              Player cards
+            </button>
             <button
               type="button"
               className="calc-btn"
               onClick={() => void refreshCurrentData()}
               disabled={refreshing}
             >
-              {refreshing ? "Refreshing…" : "Refresh"}
+              {refreshing ? "Refreshing…" : "Refresh Sims"}
             </button>
           </div>
-          {refreshError && <div className="error-box inline-refresh-error">{refreshError}</div>}
-          <JobStatus job={latestJob} />
-          {latestJob?.status === "failed" && (
-            <p className="muted-copy">
-              Fix the player stats or boss configuration, then force a new run from Admin.
-            </p>
-          )}
-        </section>
+        </header>
+
+        {refreshError && <div className="error-box inline-refresh-error">{refreshError}</div>}
+        {!player.stats && (
+          <div className="notice-box">
+            This player has no current stats. Import and save stats in Admin before running a simulation.
+          </div>
+        )}
+        {bossError && <div className="notice-box">{bossError}</div>}
 
         {customRecommendation && (
           <section className="panel section-gap recommendations-panel">
@@ -611,6 +619,23 @@ export default function PlayerRecommendations() {
             damageMultiplier={damageMultiplier}
             loading={attackLogLoading}
             error={attackLogError}
+          />
+        </section>
+
+        <section className="panel section-gap" id={PLAYER_CARDS_SECTION_ID}>
+          <div className="panel-heading-row">
+            <div>
+              <h2 className="panel-title">Player cards</h2>
+              <p className="panel-desc">
+                Card levels, highest first. Boosted cards have a green border; the green number is the
+                raid crystal boost plus the seasonal boost (hover a card for the breakdown).
+              </p>
+            </div>
+          </div>
+          <PlayerCards
+            playerCards={player?.stats?.card_list ?? []}
+            crystalBoosts={player?.stats?.raid_crystal_boosts ?? []}
+            cards={cards}
           />
         </section>
       </main>
